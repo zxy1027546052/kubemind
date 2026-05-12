@@ -17,3 +17,8 @@ class ValidationException(AppException):
 class ConflictException(AppException):
     def __init__(self, detail: str = "Resource already exists"):
         super().__init__(detail=detail, status_code=409)
+
+
+class ClusterConnectionException(AppException):
+    def __init__(self, detail: str = "Cluster connection failed"):
+        super().__init__(detail=detail, status_code=503)

@@ -45,4 +45,31 @@ def test_model_connection(db: Session, config_id: int) -> tuple[bool, str]:
     config = repo.get_by_id(db, config_id)
     if not config:
         return False, "Model config not found"
-    return True, f"Connection test passed for {config.provider}/{config.model_name}"
+    if not config.api_key:
+        return False, "API key not configured"
+
+    import json
+    import urllib.request
+
+    try:
+        payload = json.dumps({
+            "model": config.model_name,
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 1,
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            f"{config.endpoint.rstrip('/')}/chat/completions",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {config.api_key}",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status == 200:
+                return True, f"Connection successful — {config.provider}/{config.model_name}"
+            return False, f"HTTP {resp.status}"
+    except urllib.error.HTTPError as e:
+        return False, f"HTTP {e.code}: {e.reason}"
+    except Exception as e:
+        return False, str(e)

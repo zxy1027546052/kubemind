@@ -9,10 +9,13 @@ from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
 from app.core.exceptions import AppException
 from app.core.schemas import HealthResponse
+from app.seeds.alerts import seed_alerts
 from app.seeds.cases import seed_cases
+from app.seeds.diagnosis import seed_diagnoses
 from app.seeds.knowledge import seed_documents
 from app.seeds.model_config import seed_model_configs
 from app.seeds.runbooks import seed_runbooks
+from app.seeds.workflows import seed_workflows
 
 
 def run_seeds() -> None:
@@ -22,6 +25,9 @@ def run_seeds() -> None:
         seed_cases(db)
         seed_runbooks(db)
         seed_model_configs(db)
+        seed_diagnoses(db)
+        seed_alerts(db)
+        seed_workflows(db)
     finally:
         db.close()
 

@@ -1,16 +1,43 @@
+# Dependencies
 .venv/
 node_modules/
+.npm-cache/
+
+# Build output
 dist/
 build/
+
+# Environment & secrets
 .env
 .env.local
+*.pem
+*.key
+kubeconfig*.yaml
+
+# IDE / Editor
 .DS_Store
 Thumbs.db
-.npm-cache/
-draft/
-plan/
+.vscode/
+.idea/
+
+# AI assistants (local settings only)
 .claude/
 .codex/
 .trae/
-# Database
+
+# Database & runtime data
 *.db
+backend/data/
+
+# Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# Draft & plans
+draft/
+plan/
+
+# OS files
+Desktop.ini

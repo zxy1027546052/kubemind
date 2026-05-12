@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api, type Document, type DocumentCreate } from '../services/api';
+import { api, type Document, type DocumentCreate, type SearchResult } from '../services/api';
 
 const TABS = [
   { key: 'case', label: '案例库' },
@@ -39,6 +39,8 @@ export default function KnowledgeCenter() {
   const [typeFilter, setTypeFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Upload form state
   const [form, setForm] = useState<DocumentCreate>({
@@ -51,17 +53,25 @@ export default function KnowledgeCenter() {
 
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
+    setIsSearching(false);
     try {
-      const params: { query?: string; category?: string } = {};
-      if (searchQuery.trim()) params.query = searchQuery.trim();
-      if (typeFilter) params.category = typeFilter;
-
-      const data = await api.listDocuments(params);
-      setDocuments(data.items);
-      setTotal(data.total);
+      if (searchQuery.trim()) {
+        // Semantic search across all sources
+        const data = await api.search({ q: searchQuery.trim(), top_k: 20 });
+        setSearchResults(data.results);
+        setTotal(data.total);
+        setIsSearching(true);
+      } else {
+        const params: { query?: string; category?: string } = {};
+        if (typeFilter) params.category = typeFilter;
+        const data = await api.listDocuments(params);
+        setDocuments(data.items);
+        setTotal(data.total);
+      }
     } catch (err) {
       showToast('无法连接到后端服务', 'error');
       setDocuments([]);
+      setSearchResults([]);
       setTotal(0);
     } finally {
       setLoading(false);
@@ -169,22 +179,47 @@ export default function KnowledgeCenter() {
           <thead>
             <tr>
               <th>标题</th>
-              <th>类型</th>
-              <th>分类</th>
-              <th>大小</th>
+              {isSearching ? <th>来源</th> : <th>类型</th>}
+              {isSearching ? <th>相关度</th> : <th>分类</th>}
+              {!isSearching && <th>大小</th>}
               <th>创建时间</th>
-              <th>操作</th>
+              {!isSearching && <th>操作</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '40px' }}>
+                <td colSpan={isSearching ? 4 : 6} style={{ textAlign: 'center', padding: '40px' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                    加载中<span style={{ animation: 'cursor-blink 1s step-end infinite' }}>_</span>
+                    搜索中<span style={{ animation: 'cursor-blink 1s step-end infinite' }}>_</span>
                   </span>
                 </td>
               </tr>
+            ) : isSearching ? (
+              searchResults.length === 0 ? (
+                <tr>
+                  <td colSpan={4}>
+                    <div className="empty-state">
+                      <div className="empty-icon">[?]</div>
+                      <h3>未找到匹配结果</h3>
+                      <p>尝试使用其他关键词搜索</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                searchResults.map((r, i) => (
+                  <tr key={`${r.source_type}-${r.id}`} className={`stagger-${Math.min(i + 3, 6)}`}>
+                    <td className="col-title">{r.title}</td>
+                    <td>
+                      <span className={`tag ${getTagClass(r.source_type === 'runbooks' ? 'Runbook' : r.source_type === 'cases' ? '案例' : '文档')}`}>
+                        {r.source_type === 'runbooks' ? 'Runbook' : r.source_type === 'cases' ? '案例' : '文档'}
+                      </span>
+                    </td>
+                    <td className="col-mono">{Math.round(r.score * 100)}%</td>
+                    <td className="col-mono">-</td>
+                  </tr>
+                ))
+              )
             ) : documents.length === 0 ? (
               <tr>
                 <td colSpan={6}>
@@ -217,7 +252,7 @@ export default function KnowledgeCenter() {
         </table>
 
         {/* Footer */}
-        {!loading && documents.length > 0 && (
+        {!loading && (documents.length > 0 || searchResults.length > 0) && (
           <div
             style={{
               padding: '12px 22px',
@@ -227,7 +262,7 @@ export default function KnowledgeCenter() {
               color: 'var(--text-muted)',
             }}
           >
-            共 {total} 条记录
+            {isSearching ? `搜索 "${searchQuery}" — ${total} 条结果` : `共 ${total} 条记录`}
           </div>
         )}
       </div>
