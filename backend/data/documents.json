@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "title": "Runbook: MySQL Slow Query / Connection Issue",
+    "type": "Runbook",
+    "category": "slow_sql",
+    "size": "-",
+    "content": "Check slow queries, connection counts, lock waits, and pool settings.",
+    "created_at": "2026-05-12T20:38:53.555868",
+    "updated_at": "2026-05-12T20:38:53.555868"
+  },
+  {
+    "id": 2,
+    "title": "Runbook: Disk IO Saturation",
+    "type": "Runbook",
+    "category": "io_saturation",
+    "size": "-",
+    "content": "Inspect iostat, identify hot processes, and evaluate disk throughput.",
+    "created_at": "2026-05-12T20:38:53.555868",
+    "updated_at": "2026-05-12T20:38:53.555868"
+  },
+  {
+    "id": 3,
+    "title": "Runbook: Packet Loss / Bandwidth Saturation",
+    "type": "Runbook",
+    "category": "network_issue",
+    "size": "-",
+    "content": "Check NIC traffic, retransmits, error packets, and node link status.",
+    "created_at": "2026-05-12T20:38:53.555868",
+    "updated_at": "2026-05-12T20:38:53.555868"
+  }
+]
