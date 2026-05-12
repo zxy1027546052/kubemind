@@ -1,6 +1,8 @@
-from datetime import datetime
+from typing import Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
+T = TypeVar("T")
 
 
 class HealthResponse(BaseModel):
@@ -8,24 +10,12 @@ class HealthResponse(BaseModel):
     service: str = "kubemind-backend"
 
 
-class DocumentBase(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
-    type: str = Field(min_length=1, max_length=50)
-    category: str = Field(min_length=1, max_length=100)
-    size: str = Field(default="-", max_length=50)
-    content: str = Field(default="", max_length=10000)
-
-
-class DocumentCreate(DocumentBase):
-    pass
-
-
-class Document(DocumentBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-
-class DocumentListResponse(BaseModel):
+class PaginationMeta(BaseModel):
     total: int
-    items: list[Document]
+    offset: int
+    limit: int
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    pagination: PaginationMeta
+    items: list[T]

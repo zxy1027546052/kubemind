@@ -8,5 +8,9 @@ build/
 Thumbs.db
 .npm-cache/
 draft/
+plan/
 .claude/
 .codex/
+.trae/
+# Database
+*.db
