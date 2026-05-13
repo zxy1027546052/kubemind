@@ -225,3 +225,6 @@ python -m scripts.reindex_vectors --drop
 
 深色科技风 (`#0a0e17` / `#00d4ff`)，左侧导航 + 主内容区经典仪表盘布局。CSS Variables 与组件规范见 [.claude/rules/project_rules.md](.claude/rules/project_rules.md)。
 
+## 前端演示
+
+![alt text](images/image.png)
