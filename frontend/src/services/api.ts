@@ -167,6 +167,43 @@ export const api = {
   getClusterNodes: (name: string) => request<NodeInfo[]>('/clusters/' + name + '/nodes'),
 
   getClusterPods: (name: string) => request<PodInfo[]>('/clusters/' + name + '/pods'),
+
+  // Observability
+  getObservabilityHealth: () =>
+    request<ObservabilityHealth>('/observability/health'),
+
+  queryPrometheus: (q: string) => {
+    const sp = new URLSearchParams();
+    sp.set('q', q);
+    return request<PrometheusQueryResponse>(`/observability/prometheus/query?${sp.toString()}`);
+  },
+
+  queryLokiRange: (params: { q: string; start: string; end: string; limit?: number }) => {
+    const sp = new URLSearchParams();
+    sp.set('q', params.q);
+    sp.set('start', params.start);
+    sp.set('end', params.end);
+    if (params.limit !== undefined) sp.set('limit', String(params.limit));
+    return request<LokiQueryResponse>(`/observability/loki/query-range?${sp.toString()}`);
+  },
+
+  // Anomalies
+  detectAnomalies: (data: AnomalyDetectRequest, options?: { create_alerts?: boolean }) => {
+    const sp = new URLSearchParams();
+    if (options?.create_alerts) sp.set('create_alerts', 'true');
+    const qs = sp.toString();
+    return request<AnomalyDetectResponse>(`/anomalies/detect${qs ? `?${qs}` : ''}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // ChatOps
+  sendChatOpsMessage: (data: ChatOpsMessageRequest) =>
+    request<ChatOpsMessageResponse>('/chatops/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 export interface SearchResult {
@@ -346,4 +383,132 @@ export interface PodInfo {
   namespace: string;
   status: string;
   node: string;
+}
+
+// --- Observability ---
+
+export interface DataSourceHealth {
+  enabled: boolean;
+  status: string;
+  message: string;
+}
+
+export interface ObservabilityHealth {
+  prometheus: DataSourceHealth;
+  loki: DataSourceHealth;
+}
+
+export interface PrometheusPoint {
+  metric: Record<string, string>;
+  timestamp: string;
+  value: number;
+}
+
+export interface PrometheusQueryResponse {
+  query: string;
+  result_type: string;
+  points: PrometheusPoint[];
+}
+
+export interface LokiLogEntry {
+  labels: Record<string, string>;
+  timestamp: string;
+  line: string;
+}
+
+export interface LokiQueryResponse {
+  query: string;
+  entries: LokiLogEntry[];
+}
+
+// --- Anomalies ---
+
+export interface MetricPoint {
+  timestamp: string;
+  value: number;
+}
+
+export interface AnomalyDetectRequest {
+  metric_name: string;
+  resource_type: string;
+  resource_name: string;
+  namespace?: string;
+  window?: string;
+  points: MetricPoint[];
+}
+
+export interface AnomalyEvent {
+  metric_name: string;
+  resource_type: string;
+  resource_name: string;
+  namespace: string;
+  window: string;
+  value: number;
+  baseline: number;
+  upper_bound: number;
+  lower_bound: number;
+  score: number;
+  severity: string;
+  evidence: string[];
+  detected_at: string;
+}
+
+export interface AnomalyDetectResponse {
+  total: number;
+  items: AnomalyEvent[];
+  alert_ids: number[];
+}
+
+// --- ChatOps ---
+
+export interface ChatOpsMessageRequest {
+  session_id?: string;
+  message: string;
+}
+
+export interface AgentTraceItem {
+  agent: string;
+  message: string;
+}
+
+export interface ChatOpsEvidence {
+  source: string;
+  title: string;
+  summary: string;
+  score?: number;
+  source_type?: string;
+  source_id?: number;
+}
+
+export interface ChatOpsToolCall {
+  tool: string;
+  status: string;
+  query?: string;
+  namespace?: string;
+  workload?: string;
+}
+
+export interface ChatOpsRootCause {
+  title: string;
+  confidence: number;
+  evidence_count: number;
+}
+
+export interface ChatOpsRemediationStep {
+  step: string;
+  description: string;
+  requires_human_approval: boolean;
+}
+
+export interface ChatOpsMessageResponse {
+  session_id: string;
+  intent: string;
+  entities: Record<string, string>;
+  reply: string;
+  trace: AgentTraceItem[];
+  evidence: ChatOpsEvidence[];
+  tool_calls: ChatOpsToolCall[];
+  root_causes: ChatOpsRootCause[];
+  remediation_plan: ChatOpsRemediationStep[];
+  requires_human_approval: boolean;
 }

@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     # Kubernetes
     KUBECONFIG_PATH: str = "./app/config/kubeconfig.yaml"
 
+    # Observability
+    PROMETHEUS_BASE_URL: str = ""
+    PROMETHEUS_TIMEOUT_SECONDS: float = 5.0
+    LOKI_BASE_URL: str = ""
+    LOKI_TIMEOUT_SECONDS: float = 5.0
+    OBSERVABILITY_MAX_RANGE_SECONDS: int = 3600
+    OBSERVABILITY_MAX_LOG_LINES: int = 200
+
     # Vector DB (Milvus)
     VECTOR_DB_TYPE: str = "milvus"
     VECTOR_DB_HOST: str = ""

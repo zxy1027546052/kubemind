@@ -6,6 +6,7 @@ import Clusters from './pages/Clusters';
 import Topology from './pages/Topology';
 import Alerts from './pages/Alerts';
 import Diagnosis from './pages/Diagnosis';
+import ChatOps from './pages/ChatOps';
 import Workflows from './pages/Workflows';
 import Models from './pages/Models';
 import Settings from './pages/Settings';
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="topology" element={<Topology />} />
           <Route path="alerts" element={<Alerts />} />
           <Route path="diagnosis" element={<Diagnosis />} />
+          <Route path="chatops" element={<ChatOps />} />
           <Route path="workflows" element={<Workflows />} />
           <Route path="models" element={<Models />} />
           <Route path="settings" element={<Settings />} />
