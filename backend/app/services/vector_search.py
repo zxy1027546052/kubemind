@@ -1,3 +1,8 @@
+"""统一相似检索入口 — 优先走 Milvus 向量召回，失败时回落到内存 TF-IDF."""
+
+from __future__ import annotations
+
+import logging
 import math
 
 from sqlalchemy.orm import Session
@@ -5,9 +10,18 @@ from sqlalchemy.orm import Session
 from app.models.cases import Case
 from app.models.knowledge import Document
 from app.models.runbooks import Runbook
+from app.services import vector_db
 from app.services.embedding import TFIDFEmbeddingProvider, get_embedding_provider
 
+logger = logging.getLogger(__name__)
+
 SearchResult = dict  # {id, source_type, title, score}
+
+_TITLE_LOOKUP_MODELS = {
+    "documents": Document,
+    "cases": Case,
+    "runbooks": Runbook,
+}
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -21,56 +35,69 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
-def _get_text_for_document(doc: Document) -> str:
-    return f"{doc.title} {doc.content}"
+def _milvus_search(
+    db: Session, query: str, source_types: list[str], top_k: int
+) -> list[SearchResult] | None:
+    """走 Milvus 召回；不可用或异常返回 None 让上层 fallback."""
+    if not vector_db.is_available():
+        return None
+    try:
+        provider = get_embedding_provider(db)
+        qvec = provider.embed([query])
+        if not qvec or not qvec[0]:
+            return None
+        hits = vector_db.search(qvec[0], source_types, top_k)
+    except Exception as e:
+        logger.warning("Milvus search failed, falling back to TF-IDF: %s", e)
+        return None
 
-
-def _get_text_for_case(case: Case) -> str:
-    return f"{case.title} {case.symptom} {case.root_cause} {case.steps} {case.impact} {case.conclusion}"
-
-
-def _get_text_for_runbook(runbook: Runbook) -> str:
-    return f"{runbook.title} {runbook.scenario} {runbook.steps} {runbook.risk} {runbook.rollback}"
-
-
-def search_similar(
-    db: Session,
-    query: str,
-    source_types: list[str] | None = None,
-    top_k: int = 5,
-) -> list[SearchResult]:
-    if not query.strip():
+    if not hits:
         return []
 
-    if source_types is None:
-        source_types = ["documents", "cases", "runbooks"]
+    results: list[SearchResult] = []
+    for h in hits:
+        st = h.get("source_type")
+        sid = h.get("source_id")
+        title = h.get("title") or ""
+        if not title and st in _TITLE_LOOKUP_MODELS:
+            row = db.get(_TITLE_LOOKUP_MODELS[st], sid)
+            title = getattr(row, "title", "") if row else ""
+        results.append({
+            "id": int(sid) if sid is not None else 0,
+            "source_type": st,
+            "title": title,
+            "score": round(float(h.get("score", 0.0)), 4),
+        })
+    return results
 
-    # Collect all items and their texts
+
+def _tfidf_fallback(
+    db: Session, query: str, source_types: list[str], top_k: int
+) -> list[SearchResult]:
     items: list[dict] = []
     corpus: list[str] = []
 
     if "documents" in source_types:
         for doc in db.query(Document).all():
-            text = _get_text_for_document(doc)
-            items.append({"id": doc.id, "source_type": "documents", "title": doc.title, "text": text})
+            text = vector_db.build_text("documents", doc)
+            items.append({"id": doc.id, "source_type": "documents", "title": doc.title})
             corpus.append(text)
 
     if "cases" in source_types:
         for case in db.query(Case).all():
-            text = _get_text_for_case(case)
-            items.append({"id": case.id, "source_type": "cases", "title": case.title, "text": text})
+            text = vector_db.build_text("cases", case)
+            items.append({"id": case.id, "source_type": "cases", "title": case.title})
             corpus.append(text)
 
     if "runbooks" in source_types:
-        for runbook in db.query(Runbook).all():
-            text = _get_text_for_runbook(runbook)
-            items.append({"id": runbook.id, "source_type": "runbooks", "title": runbook.title, "text": text})
+        for rb in db.query(Runbook).all():
+            text = vector_db.build_text("runbooks", rb)
+            items.append({"id": rb.id, "source_type": "runbooks", "title": rb.title})
             corpus.append(text)
 
     if not items:
         return []
 
-    # Fit TF-IDF on corpus + query, then embed
     provider = TFIDFEmbeddingProvider(corpus + [query])
     query_vec = provider.embed([query])[0]
     corpus_vecs = provider.embed(corpus)
@@ -85,6 +112,22 @@ def search_similar(
                 "title": item["title"],
                 "score": round(score, 4),
             })
-
     results.sort(key=lambda r: r["score"], reverse=True)
     return results[:top_k]
+
+
+def search_similar(
+    db: Session,
+    query: str,
+    source_types: list[str] | None = None,
+    top_k: int = 5,
+) -> list[SearchResult]:
+    if not query.strip():
+        return []
+    types = source_types or ["documents", "cases", "runbooks"]
+
+    milvus_results = _milvus_search(db, query, types, top_k)
+    if milvus_results is not None:
+        return milvus_results
+
+    return _tfidf_fallback(db, query, types, top_k)

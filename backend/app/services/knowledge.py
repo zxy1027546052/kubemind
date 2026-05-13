@@ -5,6 +5,17 @@ from sqlalchemy.orm import Session
 from app.models.knowledge import Document
 from app.repositories import knowledge as repo
 from app.schemas.knowledge import DocumentCreate, DocumentUpdate
+from app.services import vector_db
+
+
+def _sync_vector(db: Session, doc: Document) -> None:
+    vector_db.sync_record(
+        db,
+        source_type="documents",
+        source_id=doc.id,
+        title=doc.title,
+        text=vector_db.build_text("documents", doc),
+    )
 
 
 def list_documents(
@@ -20,7 +31,9 @@ def get_document(db: Session, document_id: int) -> Document | None:
 def create_document(db: Session, payload: DocumentCreate) -> Document:
     now = datetime.now()
     document = Document(**payload.model_dump(), created_at=now, updated_at=now)
-    return repo.create(db, document)
+    document = repo.create(db, document)
+    _sync_vector(db, document)
+    return document
 
 
 def update_document(db: Session, document_id: int, payload: DocumentUpdate) -> Document | None:
@@ -30,7 +43,9 @@ def update_document(db: Session, document_id: int, payload: DocumentUpdate) -> D
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(document, key, value)
     document.updated_at = datetime.now()
-    return repo.update(db, document)
+    document = repo.update(db, document)
+    _sync_vector(db, document)
+    return document
 
 
 def replace_document(db: Session, document_id: int, payload: DocumentCreate) -> Document | None:
@@ -40,7 +55,9 @@ def replace_document(db: Session, document_id: int, payload: DocumentCreate) -> 
     for key, value in payload.model_dump().items():
         setattr(document, key, value)
     document.updated_at = datetime.now()
-    return repo.update(db, document)
+    document = repo.update(db, document)
+    _sync_vector(db, document)
+    return document
 
 
 def delete_document(db: Session, document_id: int) -> bool:
@@ -48,4 +65,5 @@ def delete_document(db: Session, document_id: int) -> bool:
     if not document:
         return False
     repo.delete(db, document)
+    vector_db.remove_record("documents", document_id)
     return True

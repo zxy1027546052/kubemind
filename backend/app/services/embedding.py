@@ -1,3 +1,4 @@
+import hashlib
 import json
 import math
 import urllib.request
@@ -6,6 +7,9 @@ from typing import Protocol
 from sqlalchemy.orm import Session
 
 from app.models.model_config import ModelConfig
+
+HASH_EMBEDDING_DIM = 384
+HASH_EMBEDDING_MODEL_NAME = "kubemind-hash-cgram-384"
 
 
 class EmbeddingProvider(Protocol):
@@ -95,6 +99,46 @@ class TFIDFEmbeddingProvider:
         return [self._vectorize(t) for t in texts]
 
 
+class HashEmbeddingProvider:
+    """确定性、固定维度的本地 embedding：基于字符 unigram + bigram 的 feature hashing.
+
+    - 固定维度 (HASH_EMBEDDING_DIM)，写入 Milvus 维度永不漂移
+    - 完全离线、无外部依赖、中文友好 (按字符 / 字符对统计)
+    - 余弦空间下能表达基本词袋相似度，足以作为无 API key 时的兜底
+    """
+
+    def __init__(self, dim: int = HASH_EMBEDDING_DIM) -> None:
+        self.dim = dim
+
+    @staticmethod
+    def _tokens(text: str) -> list[str]:
+        text = (text or "").lower()
+        tokens: list[str] = []
+        for ch in text:
+            if not ch.isspace():
+                tokens.append(f"u:{ch}")
+        for i in range(len(text) - 1):
+            a, b = text[i], text[i + 1]
+            if not a.isspace() and not b.isspace():
+                tokens.append(f"b:{a}{b}")
+        return tokens
+
+    def _vectorize(self, text: str) -> list[float]:
+        vec = [0.0] * self.dim
+        for tok in self._tokens(text):
+            h = hashlib.blake2b(tok.encode("utf-8"), digest_size=8).digest()
+            idx = int.from_bytes(h[:4], "big") % self.dim
+            sign = 1.0 if (h[4] & 1) else -1.0
+            vec[idx] += sign
+        norm = math.sqrt(sum(x * x for x in vec))
+        if norm > 0:
+            vec = [x / norm for x in vec]
+        return vec
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return [self._vectorize(t) for t in texts]
+
+
 def _get_active_config(db: Session, model_type: str) -> ModelConfig | None:
     return (
         db.query(ModelConfig)
@@ -103,11 +147,25 @@ def _get_active_config(db: Session, model_type: str) -> ModelConfig | None:
     )
 
 
+def _is_local_hash_config(config: ModelConfig) -> bool:
+    return (
+        config.provider == "local"
+        or config.model_name == HASH_EMBEDDING_MODEL_NAME
+        or not config.endpoint
+    )
+
+
 def get_embedding_provider(db: Session, corpus: list[str] | None = None) -> EmbeddingProvider:
+    """返回 embedding provider.
+
+    优先级：active API embedding 配置 → 本地哈希 embedding (固定维度，可写 Milvus).
+    注意：不再回落 TF-IDF — TF-IDF 维度不稳定，不能用于持久化向量库。
+    in-memory TF-IDF 回退由 `vector_search._tfidf_fallback` 自行直接构造。
+    """
     config = _get_active_config(db, "embedding")
-    if config and config.api_key:
+    if config and not _is_local_hash_config(config) and config.api_key:
         try:
             return OpenAIEmbeddingProvider(config)
         except Exception:
             pass
-    return TFIDFEmbeddingProvider(corpus)
+    return HashEmbeddingProvider()

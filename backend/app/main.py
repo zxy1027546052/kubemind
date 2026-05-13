@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -16,6 +17,9 @@ from app.seeds.knowledge import seed_documents
 from app.seeds.model_config import seed_model_configs
 from app.seeds.runbooks import seed_runbooks
 from app.seeds.workflows import seed_workflows
+from app.services import vector_db
+
+logger = logging.getLogger(__name__)
 
 
 def run_seeds() -> None:
@@ -32,10 +36,21 @@ def run_seeds() -> None:
         db.close()
 
 
+def init_vector_db() -> None:
+    db = SessionLocal()
+    try:
+        vector_db.try_init_on_startup(db)
+    except Exception as e:
+        logger.warning("Milvus init skipped: %s", e)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     run_seeds()
+    init_vector_db()
     yield
 
 
