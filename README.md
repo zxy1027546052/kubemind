@@ -1,174 +1,227 @@
-# KubeMind AI WorkBench
+# KubeMind
 
-KubeMind 是一个面向云原生与 Kubernetes 场景的 AI 运维工作台，聚焦运维总览、智能诊断、知识沉淀、告警治理、业务拓扑、工作流编排与模型配置。系统通过知识库、Runbook、案例库和语义检索能力，将日常故障处理经验沉淀为可复用的运维资产。
+> AI 驱动的云原生运维工作台 — 知识中心 / 智能诊断 / 告警 / 工作流 / Kubernetes 接入一体化。
 
+KubeMind 通过 RAG (Retrieval-Augmented Generation) 把历史故障案例和应急 Runbook 沉淀为可检索的知识资产，再结合大模型生成结构化的诊断建议，帮助 SRE 与运维工程师快速定位与处置线上问题。
 
-## 项目定位
+---
 
-在复杂的 Kubernetes 生产环境中，故障定位往往需要同时查看监控指标、日志、告警、历史案例和操作手册。KubeMind 希望将这些信息集中，让运维人员可以更快完成：
+## 功能模块
 
-- 集群运行状态查看
-- 告警与异常诊断
-- Runbook 与案例检索
-- 运维文档统一管理
-- 故障处理流程编排
-- AI 模型与系统参数配置
+| 模块 | 路由 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| 知识中心 | `/knowledge` | ✅ MVP | 文档 / 案例 / Runbook 三类知识管理与语义搜索 |
+| 智能诊断 | `/diagnosis` | ✅ MVP | 输入故障描述 → Milvus 召回 → DeepSeek 生成根因与排查步骤 |
+| AI 模型 | `/models` | ✅ MVP | LLM / Embedding 配置管理与连通性测试 |
+| 告警中心 | `/alerts` | ⚙️ 进行中 | 告警 CRUD、等级与状态筛选 |
+| 工作流 | `/workflows` | ⚙️ 进行中 | 流程模板与执行记录 |
+| 运维总览 | `/dashboard` | ⚙️ 进行中 | 集群与系统运行状态 |
+| 集群 | `/clusters` | ⚙️ 进行中 | 通过 Kubernetes API 拉取节点 / Pod 信息 |
+| 业务拓扑 | `/topology` | ⏳ 规划中 | 服务依赖图 |
+| 系统配置 | `/settings` | ⏳ 规划中 | 平台参数与权限 |
 
-## 核心功能
+详细路线图见 [plan/develop-plan.md](plan/develop-plan.md)。
 
-### 运维总览
+---
 
-集中展示 Kubernetes 集群、节点、工作负载、资源使用率和关键健康指标，帮助运维人员快速判断整体运行状态。
+## 技术栈
 
-### 智能诊断
+**前端** — React 18 · TypeScript · Vite 5 · React Router 7 · Framer Motion · 原生 CSS Variables (深色科技风)
 
-结合日志、指标、告警和历史案例进行异常分析，辅助定位根因，并给出可执行的排查建议。
+**后端** — FastAPI 0.111 · SQLAlchemy 2.x · Pydantic 2 · SQLite (开发) / PostgreSQL (生产) · pymilvus 2.4
 
-### 知识中心
+**AI / 数据** — Milvus 向量数据库 · DeepSeek (OpenAI 兼容) · OpenAI 兼容 Embedding API · 内置离线哈希 Embedding (兜底)
 
-知识中心是系统的核心沉淀区域，包含：
+**外部基础设施** — Kubernetes API · Prometheus · Loki (规划中)
 
-- **案例库**：记录历史故障、处理过程、根因和复盘结论。
-- **运维手册**：维护标准化排障步骤、操作规范和应急预案。
-- **文档管理**：支持上传、分类、搜索和删除运维文档。
-- **语义搜索**：通过自然语言检索知识库内容，快速找到相似案例和 Runbook。
-
-截图中的文档管理页展示了 Runbook 列表、类型筛选、关键词查询、创建时间和删除操作，适合用于维护 MySQL 慢查询、磁盘 IO 饱和、网络丢包、TCP TIME_WAIT、内存告警、磁盘空间告警等常见故障处理文档。
-
-### 工作流
-
-用于编排故障处理过程，将告警接入、诊断分析、人工确认、自动修复和结果记录串联成可追踪的流程。
-
-### 告警中心
-
-统一管理来自监控系统的告警信息，支持告警聚合、降噪、关联分析和处理状态跟踪。
-
-### 业务拓扑
-
-展示业务、服务、实例、依赖关系和基础设施之间的连接关系，辅助判断故障影响范围。
-
-### AI 模型
-
-管理大模型、Embedding 模型和智能诊断相关配置，为语义搜索、故障问答和知识召回提供基础能力。
-
-### 系统配置
-
-维护平台基础参数、用户权限、外部服务连接和运行时配置。
-
-## 技术架构
-
-项目可按以下方向组织：
-
-```text
-前端工作台
-  -> 运维总览 / 智能诊断 / 知识中心 / 工作流 / 告警中心 / 业务拓扑
-
-后端服务
-  -> REST API / 任务调度 / 权限控制 / 文件管理 / 知识库管理
-
-AI 能力
-  -> LLM 问答 / Embedding 向量化 / 语义检索 / 相似案例召回 / 根因分析
-
-数据与基础设施
-  -> Kubernetes / Prometheus / Loki / PostgreSQL / Redis / Milvus
-```
-
-## 推荐技术栈
-
-- **后端**：Python、FastAPI、Celery
-- **AI 编排**：LangChain、LangGraph
-- **向量检索**：Milvus 或其他向量数据库
-- **数据存储**：PostgreSQL、Redis
-- **云原生集成**：Kubernetes API、Prometheus、Loki
-- **部署方式**：Docker、Docker Compose、Kubernetes
-
-## 快速开始
-
-### 1. 克隆项目
-
-```bash
-git clone <repository-url>
-cd kubemind
-```
-
-### 2. 配置环境变量
-
-```bash
-cp .env.example .env
-```
-
-根据实际环境修改数据库、Redis、向量数据库、Kubernetes、Prometheus、Loki 和大模型相关配置。
-
-### 3. 启动基础服务
-
-```bash
-docker compose up -d
-```
-
-### 4. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-### 5. 启动后端服务
-
-```bash
-python main.py
-```
-
-### 6. 访问系统
-
-- API 文档：`http://127.0.0.1:10000/docs`
-- 健康检查：`http://127.0.0.1:10000/health`
-- 前端工作台：按实际前端服务地址访问
-
-## 典型使用场景
-
-### 故障知识沉淀
-
-将常见故障整理为 Runbook，例如：
-
-- MySQL 慢查询 / 连接异常
-- 磁盘 IO 饱和
-- 网络丢包 / 带宽饱和
-- TCP TIME_WAIT 堆积 / 短连接耗尽
-- 内存使用率告警 / Swap 紧张
-- 磁盘空间告警 / inode 耗尽
-
-### 智能故障排查
-
-当告警触发后，系统可以基于当前指标、日志片段和历史案例进行检索，辅助输出可能原因、排查路径和修复建议。
-
-### 运维流程标准化
-
-通过工作流将排查步骤固化，降低不同值班人员之间的处理差异，并保留完整的处理记录。
+---
 
 ## 目录规划
 
 ```text
 kubemind/
-├── agents/              # AI 智能体与诊断逻辑
-├── api/                 # API 路由
-├── config/              # 配置文件
-├── database/            # 数据模型与数据库连接
-├── docs/                # 项目文档
-├── tasks/               # 异步任务
-├── main.py              # 应用入口
-├── requirements.txt     # Python 依赖
-├── docker-compose.yml   # 本地编排配置
+├── frontend/                          # React + TypeScript + Vite
+│   ├── public/
+│   ├── src/
+│   │   ├── components/                # 通用 UI 组件
+│   │   │   ├── Layout.tsx             # 全局布局壳 (Sidebar + Outlet)
+│   │   │   └── Sidebar.tsx            # 左侧导航栏
+│   │   ├── pages/                     # 页面级组件 (与路由一一对应)
+│   │   │   ├── KnowledgeCenter.tsx
+│   │   │   ├── Diagnosis.tsx
+│   │   │   ├── Alerts.tsx
+│   │   │   ├── Workflows.tsx
+│   │   │   ├── Models.tsx
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Clusters.tsx
+│   │   │   ├── Topology.tsx
+│   │   │   └── Settings.tsx
+│   │   ├── services/
+│   │   │   └── api.ts                 # 统一 fetch 封装 + 各业务接口
+│   │   ├── styles/
+│   │   │   └── globals.css            # CSS Variables / 深色主题 / 网格背景
+│   │   ├── App.tsx                    # 路由表
+│   │   └── main.tsx                   # 入口
+│   ├── index.html
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── vite.config.ts                 # 含 /api → http://127.0.0.1:8000 代理
+│
+├── backend/                           # FastAPI 后端
+│   ├── app/
+│   │   ├── main.py                    # 应用入口、lifespan、CORS、异常注册
+│   │   ├── api/
+│   │   │   ├── dependencies.py        # 通用依赖 (get_db 等)
+│   │   │   └── v1/
+│   │   │       ├── router.py          # 路由聚合
+│   │   │       └── endpoints/         # 按模块拆分
+│   │   │           ├── knowledge.py   # /api/documents
+│   │   │           ├── cases.py       # /api/cases
+│   │   │           ├── runbooks.py    # /api/runbooks
+│   │   │           ├── search.py      # /api/search       (向量检索)
+│   │   │           ├── diagnosis.py   # /api/diagnosis    (RAG 诊断)
+│   │   │           ├── alerts.py      # /api/alerts
+│   │   │           ├── workflows.py   # /api/workflows
+│   │   │           ├── model_config.py# /api/models
+│   │   │           └── clusters.py    # /api/clusters
+│   │   ├── core/                      # 框架级公共能力
+│   │   │   ├── config.py              # pydantic-settings (读 app/config/.env)
+│   │   │   ├── database.py            # SQLAlchemy engine / SessionLocal / Base
+│   │   │   ├── exceptions.py          # AppException 与子类
+│   │   │   ├── schemas.py             # 通用响应 Schema (Health / Pagination)
+│   │   │   └── security.py            # API Key 校验 (预留 JWT)
+│   │   ├── config/                    # 运行时配置
+│   │   │   ├── .env                   # 环境变量 (Git 忽略)
+│   │   │   ├── .env.example           # 配置样例
+│   │   │   └── kubeconfig.yaml        # K8s 连接 (按需)
+│   │   ├── models/                    # SQLAlchemy ORM 模型
+│   │   │   ├── knowledge.py           # Document
+│   │   │   ├── cases.py               # Case
+│   │   │   ├── runbooks.py            # Runbook
+│   │   │   ├── diagnosis.py           # DiagnosisSession
+│   │   │   ├── alerts.py              # Alert
+│   │   │   ├── workflows.py           # Workflow
+│   │   │   └── model_config.py        # ModelConfig (LLM / Embedding)
+│   │   ├── schemas/                   # Pydantic 请求 / 响应 DTO (按模块)
+│   │   ├── repositories/              # 数据访问层 (按模块)
+│   │   ├── services/                  # 业务逻辑层
+│   │   │   ├── knowledge.py / cases.py / runbooks.py
+│   │   │   ├── diagnosis.py           # RAG 编排
+│   │   │   ├── llm.py                 # OpenAI 兼容聊天接口
+│   │   │   ├── embedding.py           # OpenAI / HashEmbeddingProvider
+│   │   │   ├── vector_db.py           # Milvus 客户端封装
+│   │   │   ├── vector_search.py       # 向量召回 + TF-IDF 兜底
+│   │   │   ├── alerts.py / workflows.py / model_config.py
+│   │   │   └── k8s.py                 # Kubernetes 客户端
+│   │   └── seeds/                     # 初始数据 (按模块)
+│   ├── scripts/
+│   │   └── reindex_vectors.py         # 全量回填 Milvus (--drop 重建)
+│   ├── tests/
+│   ├── data/                          # SQLite 数据 (Git 忽略)
+│   ├── requirements.txt
+│   ├── start.ps1                      # Windows 启动脚本
+│   └── README.md
+│
+├── plan/
+│   └── develop-plan.md                # 产品模块、架构图、MVP 路线图
+├── docs/                              # 设计文档与截图
+├── deploy/                            # 部署脚本与配置
+├── draft/                             # 草稿与原型
+├── package.json                       # 根工作区脚本 (可选)
+├── .env.example
+├── .gitignore
 └── README.md
 ```
 
-## 后续规划
+---
 
-- 完善知识中心的上传、分类、版本管理和全文检索能力
-- 增强语义搜索与相似故障案例召回
-- 接入 Prometheus、Loki 和 Kubernetes 实时数据
-- 支持告警自动聚合和根因分析
-- 增加工作流审批、回滚和执行审计
-- 支持多模型配置和模型效果评估
+## 快速开始
 
-## License
+### 前置依赖
 
-本项目默认采用 MIT License。
+| 依赖 | 推荐版本 | 备注 |
+| --- | --- | --- |
+| Python | 3.11+ | |
+| Node.js | 20+ | 含 npm 或 pnpm |
+| Milvus | 2.4+ | Docker `milvusdb/milvus:v2.4.x`，单机即可 |
+| Kubernetes | 任意 | 可选，仅 `/clusters` 模块需要 |
+
+### 1. 启动 Milvus (示例)
+
+```bash
+docker run -d --name milvus-standalone \
+  -p 19530:19530 -p 9091:9091 \
+  -e ETCD_USE_EMBED=true \
+  -e COMMON_STORAGETYPE=local \
+  milvusdb/milvus:v2.4.10 milvus run standalone
+```
+
+### 2. 启动后端
+
+```bash
+cd backend
+pip install -r requirements.txt
+
+# 复制并编辑配置
+cp app/config/.env.example app/config/.env
+# 至少填好 DEEPSEEK_AUTH_TOKEN 与 VECTOR_DB_HOST
+
+uvicorn app.main:app --reload --port 8000
+```
+
+首次启动会自动：建表 → 灌入种子数据 → 初始化 Milvus 集合。
+
+如需把已有种子数据写入 Milvus：
+
+```bash
+python -m scripts.reindex_vectors --drop
+```
+
+### 3. 启动前端
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+打开 `http://127.0.0.1:5173`，默认跳转到知识中心。
+
+---
+
+## 核心 API
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| GET / POST / PUT / DELETE | `/api/documents` `/api/cases` `/api/runbooks` | 三类知识 CRUD |
+| GET | `/api/search?q=&type=&top_k=` | 语义检索 (Milvus → TF-IDF 兜底) |
+| GET / POST / DELETE | `/api/diagnosis` | 诊断会话；POST 触发 RAG + LLM |
+| GET / POST / PUT / DELETE | `/api/alerts` `/api/workflows` | 告警与工作流 |
+| GET / POST / PUT / DELETE | `/api/models` | LLM / Embedding 配置；`POST /{id}/test` 测连通 |
+| GET | `/api/clusters/overview` `/api/clusters/{name}/nodes` `/api/clusters/{name}/pods` | Kubernetes 数据 |
+| GET | `/health` | 健康检查 |
+
+完整 OpenAPI 文档：`http://127.0.0.1:8000/docs`。
+
+---
+
+## Embedding 模型选择
+
+KubeMind 支持三档 Embedding，按可用性自动降级：
+
+1. **OpenAI 兼容 API** — 在 `/api/models` 配置 `model_type=embedding`、`is_active=true` 的 OpenAI / BGE / m3e 等。推荐生产使用。
+2. **本地哈希 Embedding** (`kubemind-hash-cgram-384`) — 内置离线兜底，384 维确定性哈希，中文友好，无需 API key。默认激活。
+3. **TF-IDF 内存检索** — 仅用于 Milvus 不可用时的最后兜底；不写向量库。
+
+切换 Embedding 模型后建议重跑：
+
+```bash
+python -m scripts.reindex_vectors --drop
+```
+
+---
+
+## 设计风格
+
+深色科技风 (`#0a0e17` / `#00d4ff`)，左侧导航 + 主内容区经典仪表盘布局。CSS Variables 与组件规范见 [.claude/rules/project_rules.md](.claude/rules/project_rules.md)。
+
