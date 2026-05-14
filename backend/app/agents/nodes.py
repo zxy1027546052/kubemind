@@ -3,8 +3,8 @@ from app.agents.state import OpsGraphState
 from app.services.vector_search import search_similar
 
 
-def planner_agent(state: OpsGraphState) -> OpsGraphState:
-    intent = classify_intent(state["user_query"])
+def planner_agent(state: OpsGraphState, db=None) -> OpsGraphState:
+    intent = classify_intent(state["user_query"], db=db)
     entities = extract_entities(state["user_query"])
     state["intent"] = intent
     state["entities"].update(entities)

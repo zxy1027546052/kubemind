@@ -6,3 +6,5 @@ pydantic-settings>=2.0
 python-dotenv>=1.0
 kubernetes>=30.0
 pymilvus>=2.4
+langchain-openai>=0.3
+langchain-core>=0.3

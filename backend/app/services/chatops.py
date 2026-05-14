@@ -42,7 +42,7 @@ def handle_chatops_message_stream(
     state = create_initial_state(session_id=payload.session_id, user_query=payload.message)
 
     # --- Planner ---
-    state = planner_agent(state)
+    state = planner_agent(state, db=db)
     yield _sse("agent_done", {"agent": "PlannerAgent", "intent": state["intent"], "entities": state["entities"]})
 
     # --- Retriever ---

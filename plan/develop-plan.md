@@ -73,9 +73,9 @@ flowchart TB
     end
 
     subgraph AI[AI 能力层]
-        LLM[大模型问答]
+        LLM[大模型问答<br/>LangChain ChatOpenAI]
         Embedding[Embedding 向量化]
-        Intent[意图识别]
+        Intent[意图识别<br/>关键词 + LLM 混合]
         LSTM[LSTM 时序预测]
     end
 
@@ -461,6 +461,14 @@ RCA 排序特征：
 ```
 
 ### 7.7 对话式运维与意图识别
+
+意图识别采用**混合策略**：关键词匹配优先（零延迟、零成本），未命中时调用 LLM 分类（通过 LangChain ChatOpenAI）。
+
+LLM 层使用 `langchain-openai` 的 `ChatOpenAI`，支持：
+- 动态模型切换（从 DB `model_configs` 表读取 endpoint/api_key/model_name）
+- 内置重试（max_retries=2）和超时（timeout=60s）
+- 流式输出（`.stream()` 方法，用于 ChatOps SSE 端点）
+- 兼容所有 OpenAI 协议的 provider（DeepSeek、OpenAI、Azure、本地 Ollama 等）
 
 首期意图集合：
 
