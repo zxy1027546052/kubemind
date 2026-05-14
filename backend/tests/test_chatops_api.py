@@ -57,3 +57,38 @@ def test_chatops_message_can_create_workflow_intent() -> None:
     body = response.json()
     assert body["intent"] == "create_workflow"
     assert body["requires_human_approval"] is True
+
+
+def test_general_chat_intent_not_misclassified() -> None:
+    """Conversational messages should not be classified as diagnose_issue."""
+    client = TestClient(app)
+
+    for message in ("你是什么模型", "你好", "谢谢", "你能做什么"):
+        response = client.post(
+            "/api/chatops/messages",
+            json={"session_id": "chat-200", "message": message},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["intent"] == "general_chat", f"Message '{message}' got intent={body['intent']}"
+        assert body["reply"]
+
+
+def test_stream_endpoint_returns_sse_events() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/chatops/messages/stream",
+        json={
+            "session_id": "chat-100",
+            "message": "分析 prod payment-api 的错误",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+    body = response.text
+    assert "event: agent_done" in body
+    assert "event: done" in body
+    assert "PlannerAgent" in body
+    assert "DiagnosisAgent" in body

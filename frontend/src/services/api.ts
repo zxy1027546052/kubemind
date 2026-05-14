@@ -74,27 +74,6 @@ export const api = {
     return request<SearchResponse>(`/search?${sp.toString()}`);
   },
 
-  // Diagnosis
-  createDiagnosis: (data: DiagnosisCreate) =>
-    request<DiagnosisResponse>('/diagnosis', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  getDiagnosis: (id: number) =>
-    request<DiagnosisResponse>(`/diagnosis/${id}`),
-
-  listDiagnoses: (params?: { offset?: number; limit?: number }) => {
-    const sp = new URLSearchParams();
-    if (params?.offset !== undefined) sp.set('offset', String(params.offset));
-    if (params?.limit !== undefined) sp.set('limit', String(params.limit));
-    const qs = sp.toString();
-    return request<DiagnosisResponse[]>(`/diagnosis${qs ? `?${qs}` : ''}`);
-  },
-
-  deleteDiagnosis: (id: number) =>
-    request<void>(`/diagnosis/${id}`, { method: 'DELETE' }),
-
   // Alerts
   listAlerts: (params?: { query?: string; severity?: string; status?: string; category?: string; offset?: number; limit?: number }) => {
     const sp = new URLSearchParams();
@@ -217,36 +196,6 @@ export interface SearchResponse {
   query: string;
   results: SearchResult[];
   total: number;
-}
-
-// --- Diagnosis ---
-
-export interface DiagnosisCreate {
-  query_text: string;
-}
-
-export interface MatchedItem {
-  id: number;
-  source_type: string;
-  title: string;
-  score: number;
-}
-
-export interface DiagnosisResult {
-  root_causes: string[];
-  steps: string[];
-  impact: string;
-  runbook_refs: { id: number; title: string; score: number }[];
-}
-
-export interface DiagnosisResponse {
-  id: number;
-  query_text: string;
-  matched_items: MatchedItem[];
-  llm_response: DiagnosisResult;
-  status: string;
-  created_at: string;
-  updated_at: string;
 }
 
 // --- Alerts ---

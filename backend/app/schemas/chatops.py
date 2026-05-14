@@ -19,3 +19,4 @@ class ChatOpsMessageResponse(BaseModel):
     root_causes: list[dict[str, Any]]
     remediation_plan: list[dict[str, Any]]
     requires_human_approval: bool
+    llm_reply: str = ""

@@ -14,6 +14,7 @@ from app.seeds.alerts import seed_alerts
 from app.seeds.cases import seed_cases
 from app.seeds.diagnosis import seed_diagnoses
 from app.seeds.knowledge import seed_documents
+from app.seeds.knowledge_graph import seed_knowledge_graph
 from app.seeds.model_config import seed_model_configs
 from app.seeds.runbooks import seed_runbooks
 from app.seeds.workflows import seed_workflows
@@ -32,6 +33,7 @@ def run_seeds() -> None:
         seed_diagnoses(db)
         seed_alerts(db)
         seed_workflows(db)
+        seed_knowledge_graph(db)
     finally:
         db.close()
 

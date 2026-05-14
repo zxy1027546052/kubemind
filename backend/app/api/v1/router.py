@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     clusters,
     diagnosis,
     knowledge,
+    knowledge_graph,
     model_config,
     observability,
     runbooks,
@@ -17,6 +18,7 @@ from app.api.v1.endpoints import (
 
 api_router = APIRouter(prefix="/api")
 
+api_router.include_router(knowledge_graph.router, prefix="/knowledge-graph", tags=["knowledge-graph"])
 api_router.include_router(knowledge.router, prefix="/documents", tags=["documents"])
 api_router.include_router(cases.router, prefix="/cases", tags=["cases"])
 api_router.include_router(runbooks.router, prefix="/runbooks", tags=["runbooks"])

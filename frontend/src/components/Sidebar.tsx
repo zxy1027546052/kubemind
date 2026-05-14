@@ -15,7 +15,6 @@ const opsItems: NavItem[] = [
 
 const aiItems: NavItem[] = [
   { path: '/knowledge', label: '知识中心', icon: '▣' },
-  { path: '/diagnosis', label: '智能诊断', icon: '◎' },
   { path: '/chatops', label: '对话运维', icon: '▤' },
   { path: '/workflows', label: '工作流', icon: '▻' },
   { path: '/models', label: 'AI 模型', icon: '◉' },

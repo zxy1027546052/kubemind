@@ -14,6 +14,7 @@ class OpsGraphState(TypedDict):
     remediation_plan: list[dict[str, Any]]
     requires_human_approval: bool
     trace: list[dict[str, Any]]
+    llm_reply: str
 
 
 def create_initial_state(session_id: str | None, user_query: str) -> OpsGraphState:
@@ -29,4 +30,5 @@ def create_initial_state(session_id: str | None, user_query: str) -> OpsGraphSta
         "remediation_plan": [],
         "requires_human_approval": False,
         "trace": [],
+        "llm_reply": "",
     }

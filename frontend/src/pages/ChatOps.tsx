@@ -8,11 +8,10 @@ interface ChatMessage {
 }
 
 const EXAMPLES = [
-  '查询 milvus 里面磁盘满的处理手册',
-  '查一下 prod payment-api 的 CPU 指标',
-  '看 payment-api 最近错误日志',
   '帮我分析 prod payment-api 最近错误日志',
+  '查一下 prod payment-api 的 CPU 指标',
   '找一下磁盘满的处理手册',
+  '看 payment-api 最近错误日志',
   '生成排查流程',
 ];
 
@@ -24,6 +23,7 @@ function intentLabel(intent: string): string {
     search_runbook: 'Runbook 检索',
     create_workflow: '流程创建',
     query_cluster: '集群查询',
+    general_chat: '通用对话',
   };
   return labels[intent] || intent;
 }
@@ -41,7 +41,8 @@ function sourceLabel(source: string): string {
 
 export default function ChatOps() {
   const [sessionId] = useState(() => `chat-${Date.now().toString(36)}`);
-  const [input, setInput] = useState('查一下 prod payment-api 的 CPU 指标');
+  const [input, setInput] = useState('');
+  const [diagnosisInput, setDiagnosisInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeResult, setActiveResult] = useState<ChatOpsMessageResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,12 +73,35 @@ export default function ChatOps() {
     }
   }
 
+  async function handleDiagnosis() {
+    const text = diagnosisInput.trim();
+    if (!text || loading) return;
+    setInput('');
+    setLoading(true);
+    setError('');
+
+    const message = `帮我分析以下故障：${text}`;
+    setMessages((prev) => [...prev, { role: 'user', content: message }]);
+
+    try {
+      const result = await api.sendChatOpsMessage({ session_id: sessionId, message });
+      setActiveResult(result);
+      setMessages((prev) => [...prev, { role: 'assistant', content: result.reply, result }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '对话请求失败';
+      setError(msg);
+      setMessages((prev) => [...prev, { role: 'assistant', content: `ERR: ${msg}` }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div>
       <header className="page-header stagger-1">
         <div className="page-eyebrow">chatops_console</div>
         <h1>对话式运维</h1>
-        <p className="subtitle">自然语言意图识别 · Agent 编排 · 工具调用轨迹</p>
+        <p className="subtitle">自然语言意图识别 · Agent 编排 · 工具调用轨迹 · 智能诊断</p>
       </header>
 
       <div className="chatops-grid stagger-2">
@@ -91,7 +115,7 @@ export default function ChatOps() {
             {messages.length === 0 ? (
               <div className="chatops-empty">
                 <div className="chatops-empty-code">READY</div>
-                <p>输入运维问题后，系统会识别意图、抽取槽位，并通过 Agent 状态图生成查询和诊断计划。</p>
+                <p>输入自然语言运维指令，系统将识别意图、抽取槽位，并通过 Agent 状态图生成查询和诊断计划。</p>
               </div>
             ) : (
               messages.map((message, index) => (
@@ -167,6 +191,31 @@ export default function ChatOps() {
                 <p>等待识别</p>
               )}
             </div>
+          </div>
+
+          <div className="card chatops-panel">
+            <div className="card-header">
+              <h3>快速诊断</h3>
+              <span className="card-eyebrow">describe_fault</span>
+            </div>
+            <textarea
+              className="chatops-diagnosis-input"
+              value={diagnosisInput}
+              onChange={(e) => setDiagnosisInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleDiagnosis();
+              }}
+              rows={4}
+              placeholder="描述故障现象，例如: 生产环境 MySQL 大量连接超时，API 返回 connect timeout..."
+            />
+            <button
+              className="primary"
+              onClick={handleDiagnosis}
+              disabled={loading || !diagnosisInput.trim()}
+              style={{ marginTop: 8, width: '100%' }}
+            >
+              {loading ? '分析中...' : '开始诊断'}
+            </button>
           </div>
         </aside>
       </div>
@@ -252,6 +301,23 @@ export default function ChatOps() {
               ))}
             </div>
           </section>
+
+          {activeResult.remediation_plan.length > 0 && (
+            <section className="card chatops-panel">
+              <div className="card-header">
+                <h3>处置计划</h3>
+              </div>
+              <div className="remediation-list">
+                {activeResult.remediation_plan.map((item, index) => (
+                  <div key={`${item.step}-${index}`} className="remediation-item">
+                    <strong>{item.step}</strong>
+                    <p>{item.description}</p>
+                    {item.requires_human_approval && <span className="tag warn">需人工确认</span>}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>

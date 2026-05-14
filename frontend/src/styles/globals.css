@@ -1242,6 +1242,56 @@ button.danger:hover {
   color: var(--text-muted);
 }
 
+.card-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--accent-cyan);
+  text-transform: lowercase;
+}
+
+.chatops-diagnosis-input {
+  margin-top: 12px;
+  min-height: 88px;
+  resize: vertical;
+}
+
+.remediation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.remediation-item {
+  padding: 14px;
+  background: var(--bg-root);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.remediation-item strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 400;
+  margin-bottom: 4px;
+}
+
+.remediation-item p {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.remediation-item .tag.warn {
+  display: inline-block;
+  margin-top: 8px;
+  background: rgba(210, 153, 34, 0.12);
+  color: var(--accent-amber);
+}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */

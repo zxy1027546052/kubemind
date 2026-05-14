@@ -24,6 +24,7 @@ def run_ops_graph_with_db(state: OpsGraphState, db=None) -> OpsGraphState:
     for node in (planner_agent, retriever_agent):
         state = node(state)
     state = milvus_agent(state, db=db)
-    for node in (observability_agent, diagnosis_agent):
+    for node in (observability_agent,):
         state = node(state)
+    state = diagnosis_agent(state, db=db)
     return state
