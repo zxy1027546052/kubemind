@@ -1740,6 +1740,17 @@ button.small {
   box-shadow: 0 0 16px rgba(255, 51, 102, 0.2);
 }
 
+.btn-info {
+  background: transparent;
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.btn-info:hover {
+  background: rgba(0, 212, 255, 0.08);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.2);
+}
+
 /* ============================================================
    END OF FILE
    ============================================================ */

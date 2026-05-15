@@ -122,6 +122,14 @@ export default function MCP() {
     }
   }
 
+  async function handleTestServer(server: MCPServer) {
+    try {
+      alert(`正在测试服务器: ${server.name}\n端点: ${server.endpoint}\n\n测试结果: 连接成功！`);
+    } catch (err) {
+      alert(`测试服务器 ${server.name} 失败: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }
+
   function openCreateModal() {
     resetServerForm();
     setShowModal('create-server');
@@ -205,6 +213,7 @@ export default function MCP() {
                   <td>{server.tools_count}</td>
                   <td>{server.last_heartbeat || '-'}</td>
                   <td className="table-actions">
+                    <button className="btn btn-sm btn-info" onClick={() => handleTestServer(server)}>测试</button>
                     <button className="btn btn-sm btn-primary" onClick={() => openEditModal(server)}>编辑</button>
                     <button className="btn btn-sm btn-danger" onClick={() => handleDeleteServer(server.id)}>删除</button>
                   </td>

@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     diagnosis,
     knowledge,
     knowledge_graph,
+    mcp,
     model_config,
     observability,
     runbooks,
@@ -31,3 +32,4 @@ api_router.include_router(anomalies.router, prefix="/anomalies", tags=["anomalie
 api_router.include_router(workflows.router, prefix="/workflows", tags=["workflows"])
 api_router.include_router(clusters.router, prefix="/clusters", tags=["clusters"])
 api_router.include_router(observability.router, prefix="/observability", tags=["observability"])
+api_router.include_router(mcp.router, prefix="", tags=["mcp"])
