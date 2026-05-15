@@ -1,2 +1,2 @@
-cd d:/python_project/kubemind/backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 10000
+cd d:/python_project/kubemind/backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 12000
 cd d:/python_project/kubemind/frontend && npm run dev
