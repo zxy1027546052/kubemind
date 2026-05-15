@@ -1,3 +1,7 @@
+import json
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
 from app.agents.intent import classify_intent, extract_entities
 from app.agents.state import OpsGraphState
 from app.services.vector_search import search_similar
@@ -107,6 +111,52 @@ def observability_agent(state: OpsGraphState) -> OpsGraphState:
     return state
 
 
+def mcp_ops_agent(state: OpsGraphState, db=None, mcp_service=None) -> OpsGraphState:
+    if state["intent"] == "general_chat":
+        _append_trace(state, "McpOpsAgent", "general chat, skipped MCP tools")
+        return state
+    if db is None:
+        _append_trace(state, "McpOpsAgent", "MCP tools skipped: db unavailable")
+        return state
+
+    service = mcp_service or _build_mcp_service()
+    requests = _build_mcp_tool_requests(state)
+    if not requests:
+        _append_trace(state, "McpOpsAgent", "no matching MCP tools")
+        return state
+
+    executed = 0
+    for request in requests:
+        result = service.execute_tool(
+            db=db,
+            tool_name=request["tool_name"],
+            params=request["params"],
+            session_id=state["session_id"],
+            trace_id=request.get("trace_id"),
+            namespace=request.get("namespace", ""),
+        )
+        status = "executed" if result.get("success") else "error"
+        state["tool_calls"].append({
+            "tool": request["tool_name"],
+            "status": status,
+            "namespace": request.get("namespace", ""),
+            "workload": state["entities"].get("workload", ""),
+            "audit_id": result.get("audit_id"),
+            "duration_ms": result.get("duration_ms", 0),
+        })
+        state["evidence"].append({
+            "source": "mcp",
+            "title": f"{request['tool_name']} {status}",
+            "summary": _summarize_tool_result(result),
+            "score": 1.0 if result.get("success") else 0.0,
+        })
+        if result.get("success"):
+            executed += 1
+
+    _append_trace(state, "McpOpsAgent", f"MCP tools executed: {executed}/{len(requests)}")
+    return state
+
+
 def diagnosis_agent(state: OpsGraphState, db=None) -> OpsGraphState:
     if state["intent"] == "general_chat":
         state["root_causes"].append({
@@ -201,6 +251,87 @@ def _tool_name_for_intent(intent: str) -> str:
     if intent == "query_cluster":
         return "kubernetes.overview"
     return "prometheus.query"
+
+
+def _build_mcp_service():
+    from app.services.mcp import MCPService
+
+    return MCPService()
+
+
+def _build_mcp_tool_requests(state: OpsGraphState) -> list[dict[str, Any]]:
+    intent = state["intent"]
+    entities = state["entities"]
+    namespace = entities.get("namespace") or "default"
+    workload = entities.get("workload") or ""
+    metric = entities.get("metric") or "cpu"
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(minutes=15)
+
+    if intent == "diagnose_issue":
+        requests = [
+            {"tool_name": "k8s_get_pods", "params": {"namespace": namespace}, "namespace": namespace},
+            {
+                "tool_name": "k8s_get_events",
+                "params": {"namespace": namespace, "involved_object_name": workload, "limit": 50},
+                "namespace": namespace,
+            },
+        ]
+        return requests
+
+    if intent == "query_logs":
+        return [
+            {
+                "tool_name": "k8s_get_pod_logs",
+                "params": {"namespace": namespace, "name": workload or "unknown", "tail_lines": 100},
+                "namespace": namespace,
+            },
+            {
+                "tool_name": "loki_query",
+                "params": {
+                    "query": _build_loki_query(namespace, workload),
+                    "start": start.isoformat(),
+                    "end": now.isoformat(),
+                    "limit": 100,
+                },
+                "namespace": namespace,
+            },
+        ]
+
+    if intent == "query_metric":
+        return [{
+            "tool_name": "prometheus_query",
+            "params": {"query": _build_prometheus_query(namespace, workload, metric)},
+            "namespace": namespace,
+        }]
+
+    if intent == "query_cluster":
+        return [{"tool_name": "k8s_get_pods", "params": {"namespace": namespace}, "namespace": namespace}]
+
+    return []
+
+
+def _build_prometheus_query(namespace: str, workload: str, metric: str) -> str:
+    pod_filter = f',pod=~"{workload}.*"' if workload else ""
+    if metric == "memory":
+        return f'sum(container_memory_working_set_bytes{{namespace="{namespace}"{pod_filter}}})'
+    return f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}"{pod_filter}}}[5m]))'
+
+
+def _build_loki_query(namespace: str, workload: str) -> str:
+    base = f'{{namespace="{namespace}"}}'
+    if not workload:
+        return base
+    return f'{base} |= "{workload}"'
+
+
+def _summarize_tool_result(result: dict[str, Any]) -> str:
+    if not result.get("success"):
+        return str(result.get("error") or "tool execution failed")
+    payload = result.get("result", {})
+    if isinstance(payload, dict) and "logs" in payload:
+        return str(payload.get("logs", ""))[:500]
+    return json.dumps(payload, ensure_ascii=False, default=str)[:500]
 
 
 def _normalize_vector_query(query: str) -> str:

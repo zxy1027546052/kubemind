@@ -32,6 +32,7 @@ def handle_chatops_message_stream(
     """Run the agent graph and yield SSE events as agents progress."""
     from app.agents.nodes import (
         diagnosis_agent,
+        mcp_ops_agent,
         milvus_agent,
         observability_agent,
         planner_agent,
@@ -56,6 +57,10 @@ def handle_chatops_message_stream(
     # --- Observability ---
     state = observability_agent(state)
     yield _sse("agent_done", {"agent": "ObservabilityAgent"})
+
+    # --- MCP Ops Tools ---
+    state = mcp_ops_agent(state, db=db)
+    yield _sse("agent_done", {"agent": "McpOpsAgent", "tool_call_count": len(state["tool_calls"])})
 
     # --- Diagnosis with streaming LLM ---
     if db and state["intent"] in {"diagnose_issue", "search_runbook", "query_metric", "query_logs"}:

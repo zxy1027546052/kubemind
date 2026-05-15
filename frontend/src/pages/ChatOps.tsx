@@ -42,7 +42,6 @@ function sourceLabel(source: string): string {
 export default function ChatOps() {
   const [sessionId] = useState(() => `chat-${Date.now().toString(36)}`);
   const [input, setInput] = useState('');
-  const [diagnosisInput, setDiagnosisInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeResult, setActiveResult] = useState<ChatOpsMessageResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,29 +58,6 @@ export default function ChatOps() {
     setError('');
     setMessages((prev) => [...prev, { role: 'user', content: message }]);
     setInput('');
-
-    try {
-      const result = await api.sendChatOpsMessage({ session_id: sessionId, message });
-      setActiveResult(result);
-      setMessages((prev) => [...prev, { role: 'assistant', content: result.reply, result }]);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '对话请求失败';
-      setError(msg);
-      setMessages((prev) => [...prev, { role: 'assistant', content: `ERR: ${msg}` }]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDiagnosis() {
-    const text = diagnosisInput.trim();
-    if (!text || loading) return;
-    setInput('');
-    setLoading(true);
-    setError('');
-
-    const message = `帮我分析以下故障：${text}`;
-    setMessages((prev) => [...prev, { role: 'user', content: message }]);
 
     try {
       const result = await api.sendChatOpsMessage({ session_id: sessionId, message });
@@ -193,30 +169,6 @@ export default function ChatOps() {
             </div>
           </div>
 
-          <div className="card chatops-panel">
-            <div className="card-header">
-              <h3>快速诊断</h3>
-              <span className="card-eyebrow">describe_fault</span>
-            </div>
-            <textarea
-              className="chatops-diagnosis-input"
-              value={diagnosisInput}
-              onChange={(e) => setDiagnosisInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleDiagnosis();
-              }}
-              rows={4}
-              placeholder="描述故障现象，例如: 生产环境 MySQL 大量连接超时，API 返回 connect timeout..."
-            />
-            <button
-              className="primary"
-              onClick={handleDiagnosis}
-              disabled={loading || !diagnosisInput.trim()}
-              style={{ marginTop: 8, width: '100%' }}
-            >
-              {loading ? '分析中...' : '开始诊断'}
-            </button>
-          </div>
         </aside>
       </div>
 

@@ -3,7 +3,14 @@ import re
 from sqlalchemy.orm import Session
 
 NAMESPACE_PATTERN = re.compile(r"\b(default|prod|dev|test|staging|kube-system)\b", re.IGNORECASE)
-WORKLOAD_PATTERN = re.compile(r"\b([a-z][a-z0-9-]*(?:api|server|service|worker|gateway)[a-z0-9-]*)\b", re.IGNORECASE)
+WORKLOAD_PATTERN = re.compile(
+    r"\b([a-z][a-z0-9-]*(?:api|app|demoapp|server|service|worker|gateway|web|frontend|backend)[a-z0-9-]*)\b",
+    re.IGNORECASE,
+)
+IGNORED_WORKLOAD_TOKENS = {
+    "error", "errors", "log", "logs", "show", "view", "check", "query",
+    "default", "prod", "dev", "test", "staging", "kube-system",
+}
 
 _GENERAL_CHAT_KEYWORDS = (
     "你好", "你是谁", "什么模型", "模型是", "哪个模型", "版本",
@@ -101,7 +108,7 @@ def extract_entities(message: str) -> dict[str, str]:
 
     if namespace_match:
         entities["namespace"] = namespace_match.group(1).lower()
-    if workload_match:
+    if workload_match and workload_match.group(1).lower() not in IGNORED_WORKLOAD_TOKENS:
         entities["workload"] = workload_match.group(1)
     if "cpu" in message.lower():
         entities["metric"] = "cpu"

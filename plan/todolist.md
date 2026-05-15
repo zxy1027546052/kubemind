@@ -29,13 +29,13 @@
   - [x] 实现 ObservabilityAgent
   - [x] 实现 DiagnosisAgent
   - [x] 记录 Agent 执行轨迹
-- [ ] 封装 MCP / 运维工具层
-  - [ ] 定义工具注册表（统一 Schema、权限、超时、重试）
-  - [ ] 封装 Kubernetes 只读工具（pods/events/logs/describe）
-  - [ ] 封装 Prometheus 查询工具
-  - [ ] 封装 Loki 查询工具
-  - [ ] 增加工具调用审计记录（入库 + 关联会话/Trace）
-  - [ ] 工具白名单与命名空间隔离
+- [x] 封装 MCP / 运维工具层
+  - [x] 定义工具注册表（统一 Schema、权限、超时、重试）
+  - [x] 封装 Kubernetes 只读工具（pods/events/logs/describe）
+  - [x] 封装 Prometheus 查询工具
+  - [x] 封装 Loki 查询工具
+  - [x] 增加工具调用审计记录（入库 + 关联会话/Trace）
+  - [x] 工具白名单与命名空间隔离
 - [ ] 增强根因分析
   - [ ] 聚合告警、异常、指标、日志和相似案例
   - [ ] 输出根因 TopN
@@ -155,3 +155,5 @@
 - 2026-05-15: 收拢前端功能——**删除独立 智能诊断 页面**，合并至对话运维 `/chatops`（新增快速诊断输入区、Agent 轨迹、根因候选、处置计划面板）；`/diagnosis` → `/chatops` 重定向；后端诊断 API 保持不变供内部 Agent 调用。`npm run build` + 31/31 测试全部通过。
 - 2026-05-15: 完成 P2 故障知识图谱——模型层（KnowledgeEntity + KnowledgeRelationship，支持 k8s_cluster/node/namespace/pod/deployment/alert/case/runbook 等实体类型及 BELONGS_TO/CONTAINS/TRIGGERED_BY/CAUSES/MITIGATES 关系）、服务层（_upsert_entity/_link/build_from_k8s/build_from_runbooks/build_from_cases/rebuild_graph/get_graph_snapshot）、API 层（GET /api/knowledge-graph/graph + POST /api/knowledge-graph/graph/build）、种子数据。**14/14 KG 测试全通过**；全量 29/30（1 个 chatops 测试为已有 flaky 问题，非本次引入）。
 - 2026-05-15: **引入 LangChain 重构 LLM 层**——`llm.py` 从 raw urllib 改为 `langchain-openai` 的 `ChatOpenAI`（支持内置重试、超时、流式输出）；意图识别改为混合策略（关键词优先 + LLM 兜底分类）；`planner_agent` 接入 db 参数支持 LLM 意图分类。依赖新增 `langchain-openai>=0.3` + `langchain-core>=0.3`。**32/32 测试全部通过**。
+- 2026-05-16: **完成 MCP / 运维工具层**——引入 `fastmcp>=3.3,<4.0`，新增独立 FastMCP 微服务 `app.mcp_server`（默认 `http://127.0.0.1:11000/mcp/`）和 `start_mcp.ps1`；新增统一工具注册表 `ops_tools`，覆盖 Kubernetes 只读 pods/events/logs/describe、Prometheus instant/range、Loki range 查询；`MCPService` 接入内置工具白名单、超时、重试、命名空间策略和审计入库；前端 `/mcp` 页面完成联调。验证：`pytest backend/tests` **38/38 通过**，`npm --prefix frontend run build` 通过，API 工具执行 smoke test 返回 default namespace Pod 并写入审计。
+- 2026-05-16: **增强对话式运维实时工具闭环**——新增 `McpOpsAgent`，ChatOps 在 `query_logs` / `query_metric` / `query_cluster` / `diagnose_issue` 意图下会调用 MCP 只读工具，并将执行结果、错误和审计 ID 回写到 `tool_calls` 与 `evidence`；流式接口同步输出 `McpOpsAgent` 进度；扩展 workload 抽取支持 `*-app` / `*-demoapp` / `web` / `frontend` / `backend` 等常见命名。验证：新增 `backend/tests/test_mcp_chatops_agent.py`、`backend/tests/test_chatops_intent_mcp.py`，`pytest backend/tests` **43/43 通过**；本地 API smoke：`show default java-demoapp error logs` 返回 `query_logs`，并执行 `k8s_get_pod_logs` + `loki_query`。

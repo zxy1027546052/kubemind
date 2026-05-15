@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy.orm import Session
 from app.models.mcp import MCPServer, Tool, SecurityPolicy
 
@@ -120,3 +122,52 @@ def seed_mcp_data(db: Session):
     
     db.commit()
     print("MCP seed data created successfully")
+
+
+def sync_builtin_mcp_tools(db: Session):
+    from app.services.ops_tools import build_ops_tool_registry
+
+    server = db.query(MCPServer).filter(MCPServer.name == "kubemind-ops-mcp").first()
+    if not server:
+        server = MCPServer(
+            name="kubemind-ops-mcp",
+            type="local",
+            status="online",
+            endpoint="http://127.0.0.1:11000/mcp/",
+            tools_count=0,
+            metadata_json='{"description": "KubeMind FastMCP ops tool microservice"}',
+        )
+        db.add(server)
+        db.flush()
+
+    registry = build_ops_tool_registry()
+    for spec in registry.values():
+        tool = db.query(Tool).filter(Tool.name == spec.name).first()
+        parameters = json.dumps(spec.parameters)
+        if tool:
+            tool.category = spec.category
+            tool.risk_level = spec.risk_level
+            tool.timeout_ms = spec.timeout_ms
+            tool.retry = spec.retry
+            tool.description = spec.description
+            tool.function_name = spec.name
+            tool.parameters = parameters
+            tool.mcp_server_id = server.id
+            continue
+        db.add(
+            Tool(
+                name=spec.name,
+                category=spec.category,
+                risk_level=spec.risk_level,
+                enabled=True,
+                timeout_ms=spec.timeout_ms,
+                retry=spec.retry,
+                description=spec.description,
+                mcp_server_id=server.id,
+                function_name=spec.name,
+                parameters=parameters,
+            )
+        )
+
+    server.tools_count = len(registry)
+    db.commit()

@@ -15,7 +15,7 @@ from app.seeds.cases import seed_cases
 from app.seeds.diagnosis import seed_diagnoses
 from app.seeds.knowledge import seed_documents
 from app.seeds.knowledge_graph import seed_knowledge_graph
-from app.seeds.mcp import seed_mcp_data
+from app.seeds.mcp import seed_mcp_data, sync_builtin_mcp_tools
 from app.seeds.model_config import seed_model_configs
 from app.seeds.runbooks import seed_runbooks
 from app.seeds.workflows import seed_workflows
@@ -36,6 +36,7 @@ def run_seeds() -> None:
         seed_workflows(db)
         seed_knowledge_graph(db)
         seed_mcp_data(db)
+        sync_builtin_mcp_tools(db)
     finally:
         db.close()
 

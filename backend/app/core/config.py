@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 _config_dir = Path(__file__).resolve().parent.parent / "config"
@@ -37,9 +38,19 @@ class Settings(BaseSettings):
     VECTOR_DB_PASSWORD: str = ""
     VECTOR_DB_COLLECTION_NAME: str = "kubemind_docs"
 
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str) and value.lower() in {"release", "prod", "production"}:
+            return False
+        return value
+
     model_config = {
         "env_file": str(_config_dir / ".env"),
         "env_file_encoding": "utf-8",
+        "extra": "ignore",
     }
 
 

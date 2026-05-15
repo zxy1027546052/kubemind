@@ -138,11 +138,12 @@ class ToolRepository:
 
 class AuditRecordRepository:
     def get_all(self, db: Session, tool_name: Optional[str] = None, session_id: Optional[str] = None, offset: int = 0, limit: int = 100) -> List[AuditRecord]:
-        query = select(AuditRecord).order_by(desc(AuditRecord.created_at)).offset(offset).limit(limit)
+        query = select(AuditRecord)
         if tool_name:
             query = query.where(AuditRecord.tool_name == tool_name)
         if session_id:
             query = query.where(AuditRecord.session_id == session_id)
+        query = query.order_by(desc(AuditRecord.created_at)).offset(offset).limit(limit)
         result = db.execute(query)
         return result.scalars().all()
 

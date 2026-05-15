@@ -1,6 +1,6 @@
-fastapi==0.111.0
-uvicorn[standard]==0.30.1
-pydantic==2.7.4
+fastapi==0.136.1
+uvicorn[standard]>=0.47,<0.48
+pydantic>=2.13,<3.0
 sqlalchemy>=2.0,<3.0
 pydantic-settings>=2.0
 python-dotenv>=1.0
@@ -8,3 +8,4 @@ kubernetes>=30.0
 pymilvus>=2.4
 langchain-openai>=0.3
 langchain-core>=0.3
+fastmcp>=3.3,<4.0

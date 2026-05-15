@@ -87,6 +87,90 @@ class K8sClient:
         except Exception:
             return []
 
+    def get_events(self, namespace: str = "", involved_object_name: str = "", limit: int = 50) -> list[dict]:
+        if not self._connected:
+            return []
+        try:
+            from kubernetes import client
+
+            v1 = client.CoreV1Api()
+            if namespace:
+                events = v1.list_namespaced_event(namespace=namespace, limit=limit).items
+            else:
+                events = v1.list_event_for_all_namespaces(limit=limit).items
+
+            result = []
+            for event in events:
+                involved_object = event.involved_object
+                object_name = involved_object.name if involved_object else ""
+                if involved_object_name and object_name != involved_object_name:
+                    continue
+                result.append({
+                    "namespace": event.metadata.namespace if event.metadata else "",
+                    "name": event.metadata.name if event.metadata else "",
+                    "type": event.type or "",
+                    "reason": event.reason or "",
+                    "message": event.message or "",
+                    "involved_object_kind": involved_object.kind if involved_object else "",
+                    "involved_object_name": object_name,
+                    "last_timestamp": event.last_timestamp.isoformat() if event.last_timestamp else None,
+                })
+            return result[:limit]
+        except Exception:
+            return []
+
+    def get_pod_logs(self, name: str, namespace: str = "default", tail_lines: int = 100) -> dict:
+        if not self._connected:
+            return {"name": name, "namespace": namespace, "logs": "", "error": self._error or "Kubernetes is disconnected"}
+        try:
+            from kubernetes import client
+
+            v1 = client.CoreV1Api()
+            logs = v1.read_namespaced_pod_log(
+                name=name,
+                namespace=namespace,
+                tail_lines=tail_lines,
+                timestamps=True,
+            )
+            return {"name": name, "namespace": namespace, "tail_lines": tail_lines, "logs": logs}
+        except Exception as e:
+            return {"name": name, "namespace": namespace, "logs": "", "error": str(e)}
+
+    def describe_pod(self, name: str, namespace: str = "default") -> dict:
+        if not self._connected:
+            return {"name": name, "namespace": namespace, "error": self._error or "Kubernetes is disconnected"}
+        try:
+            from kubernetes import client
+
+            v1 = client.CoreV1Api()
+            pod = v1.read_namespaced_pod(name=name, namespace=namespace)
+            containers = []
+            if pod.status and pod.status.container_statuses:
+                for status in pod.status.container_statuses:
+                    containers.append({
+                        "name": status.name,
+                        "ready": status.ready,
+                        "restart_count": status.restart_count,
+                        "image": status.image,
+                    })
+            conditions = []
+            if pod.status and pod.status.conditions:
+                conditions = [
+                    {"type": condition.type, "status": condition.status, "reason": condition.reason or ""}
+                    for condition in pod.status.conditions
+                ]
+            return {
+                "name": pod.metadata.name if pod.metadata else name,
+                "namespace": pod.metadata.namespace if pod.metadata else namespace,
+                "status": pod.status.phase if pod.status else "",
+                "node": pod.spec.node_name if pod.spec else "",
+                "labels": pod.metadata.labels if pod.metadata and pod.metadata.labels else {},
+                "containers": containers,
+                "conditions": conditions,
+            }
+        except Exception as e:
+            return {"name": name, "namespace": namespace, "error": str(e)}
+
     def get_overview(self) -> dict:
         nodes = self.get_nodes()
         pods = self.get_pods()

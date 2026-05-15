@@ -1288,12 +1288,6 @@ button.small {
   text-transform: lowercase;
 }
 
-.chatops-diagnosis-input {
-  margin-top: 12px;
-  min-height: 88px;
-  resize: vertical;
-}
-
 .remediation-list {
   display: flex;
   flex-direction: column;
@@ -1382,60 +1376,7 @@ button.small {
    ============================================================ */
 
 .mcp-page .page-header {
-  margin-bottom: 20px;
-}
-
-.mcp-page .page-title {
-  font-size: 2rem;
-  margin-bottom: 8px;
-}
-
-.mcp-page .page-subtitle {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
-
-.mcp-page .tabs-container {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 20px;
-}
-
-.mcp-page .tabs-container .tab {
-  padding: 14px 22px;
-  font-family: var(--font-display);
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all var(--duration-fast) var(--ease-out-expo);
-  background: none;
-  border-top: none;
-  border-left: none;
-  border-right: none;
-  border-radius: 0;
-}
-
-.mcp-page .tabs-container .tab:hover {
-  color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.01);
-}
-
-.mcp-page .tabs-container .tab.active {
-  color: var(--accent-cyan);
-  border-bottom-color: var(--accent-cyan);
-  box-shadow: 0 1px 12px rgba(0, 229, 255, 0.1);
-}
-
-.mcp-page .content-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 24px;
+  margin-bottom: 28px;
 }
 
 .mcp-page .loading-spinner {
@@ -1464,158 +1405,160 @@ button.small {
   overflow-x: auto;
 }
 
-/* Tool Category Section */
-.tool-category-section {
-  margin-bottom: 32px;
+.mcp-count {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
 }
 
-.tool-category-section:last-child {
+.mcp-action {
+  background: transparent;
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  padding: 4px 10px;
+}
+
+.mcp-action:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+.mcp-tool-list {
+  padding: 22px;
+}
+
+.mcp-tool-section {
+  margin-bottom: 26px;
+}
+
+.mcp-tool-section:last-child {
   margin-bottom: 0;
 }
 
-.tool-category-title {
-  font-size: 1.125rem;
-  margin-bottom: 16px;
+.mcp-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mcp-section-header h3 {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
   color: var(--text-primary);
+  font-weight: 400;
 }
 
-.tools-grid {
+.mcp-section-header span {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.mcp-tools-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
 }
 
-.tool-card {
+.mcp-tool-card {
   background: var(--bg-root);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: 14px;
+  min-height: 178px;
+  display: flex;
+  flex-direction: column;
   transition: all var(--duration-fast) var(--ease-out-expo);
 }
 
-.tool-card:hover {
-  border-color: rgba(0, 229, 255, 0.25);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+.mcp-tool-card:hover {
+  border-color: rgba(0, 229, 255, 0.28);
+  box-shadow: inset 0 0 18px rgba(0, 229, 255, 0.025);
 }
 
-.tool-card-header {
+.mcp-tool-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
-.tool-card-name {
-  font-family: var(--font-display);
-  font-size: 0.9375rem;
-  color: var(--text-primary);
-}
-
-.tool-card-risk {
+.mcp-tool-name {
   font-family: var(--font-mono);
-  font-size: 0.625rem;
-  letter-spacing: 0.08em;
-  padding: 3px 10px;
-  border-radius: var(--radius-sm);
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.tool-card-description {
   font-size: 0.8125rem;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.mcp-tool-card p,
+.mcp-policy-card p {
   color: var(--text-secondary);
-  margin-bottom: 12px;
-  line-height: 1.5;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  margin: 0 0 12px;
 }
 
-.tool-card-meta {
+.mcp-tool-meta {
   display: flex;
-  gap: 16px;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: auto;
   margin-bottom: 12px;
 }
 
-.tool-card button {
+.mcp-tool-meta span {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.mcp-tool-card button {
   width: 100%;
 }
 
-/* Policies Grid */
-.policies-grid {
+.mcp-policies-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  padding: 22px;
 }
 
-.policy-card {
+.mcp-policy-card {
   background: var(--bg-root);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: 14px;
 }
 
-.policy-card-header {
+.mcp-policy-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
 }
 
-.policy-card-name {
+.mcp-policy-card-header > span:first-child {
   font-family: var(--font-display);
   font-size: 0.9375rem;
   color: var(--text-primary);
 }
 
-.policy-card-status {
+.mcp-policy-type {
   font-family: var(--font-mono);
-  font-size: 0.625rem;
-  letter-spacing: 0.08em;
-  padding: 3px 10px;
-  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  color: var(--accent-cyan);
   text-transform: uppercase;
-  font-weight: 600;
-}
-
-.policy-card-status.enabled {
-  color: var(--accent-green);
-  background: rgba(57, 255, 20, 0.08);
-}
-
-.policy-card-status.disabled {
-  color: var(--text-muted);
-  background: rgba(107, 114, 128, 0.08);
-}
-
-.policy-card-type {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-muted);
   margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.policy-card-description {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  margin-bottom: 12px;
-  line-height: 1.5;
-}
-
-.policy-card-rules {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 10px;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-primary);
-}
-
-.policy-card-rules code {
-  font-family: inherit;
 }
 
 /* Status Badge */
@@ -1677,78 +1620,18 @@ button.small {
   word-break: break-all;
 }
 
-/* Buttons in MCP */
-.btn {
-  cursor: pointer;
-  border: 1px solid var(--border-default);
+.mcp-policy-card pre {
   background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  padding: 10px 18px;
-  border-radius: var(--radius-md);
-  font-family: var(--font-display);
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  transition: all var(--duration-fast) var(--ease-out-expo);
-  position: relative;
-  overflow: hidden;
-}
-
-.btn:hover {
-  color: var(--text-primary);
-  border-color: var(--border-active);
-  background: var(--bg-surface);
-}
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 0.75rem;
-}
-
-.btn-primary {
-  background: transparent;
-  border: 1px solid var(--accent-cyan);
-  color: var(--accent-cyan);
-  box-shadow: var(--glow-cyan);
-}
-
-.btn-primary:hover {
-  background: rgba(0, 229, 255, 0.08);
-  box-shadow: 0 0 24px rgba(0, 229, 255, 0.25), 0 0 6px rgba(0, 229, 255, 0.4);
-}
-
-.btn-secondary {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  color: var(--text-secondary);
-}
-
-.btn-secondary:hover {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border-color: var(--border-active);
-}
-
-.btn-danger {
-  background: transparent;
-  border: 1px solid var(--accent-red);
-  color: var(--accent-red);
-}
-
-.btn-danger:hover {
-  background: rgba(255, 51, 102, 0.08);
-  box-shadow: 0 0 16px rgba(255, 51, 102, 0.2);
-}
-
-.btn-info {
-  background: transparent;
-  border: 1px solid var(--accent-cyan);
-  color: var(--accent-cyan);
-}
-
-.btn-info:hover {
-  background: rgba(0, 212, 255, 0.08);
-  box-shadow: 0 0 16px rgba(0, 212, 255, 0.2);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.55;
+  margin: 0;
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ============================================================

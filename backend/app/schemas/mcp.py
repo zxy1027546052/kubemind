@@ -98,8 +98,8 @@ class AuditRecordResponse(BaseModel):
     status: str
     duration_ms: int
     params: str
-    result_summary: str
-    error_message: str
+    result_summary: Optional[str] = None
+    error_message: Optional[str] = None
     namespace: str
     created_at: datetime
 
