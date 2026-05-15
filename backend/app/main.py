@@ -83,6 +83,6 @@ def app_exception_handler(_request: Request, exc: AppException) -> JSONResponse:
 app.include_router(api_router)
 
 
-@app.get("/health", response_model=HealthResponse, tags=["health"])
+@app.get("/api/health", response_model=HealthResponse, tags=["health"])
 def health() -> HealthResponse:
     return HealthResponse()

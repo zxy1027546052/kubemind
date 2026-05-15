@@ -325,8 +325,12 @@ sequenceDiagram
 
 | 页面 | 路由 | 主要组件 | MVP 要求 |
 | --- | --- | --- | --- |
-| 系统配置 | `/settings` | 数据源配置、权限配置、工具安全策略 | 后续实现 |
+| 系统配置 | `/settings` | 用户配置、权限配置 | 后续实现 |
 | 模型服务 | `/models` | 模型配置表单、连接测试、激活状态 | 保存配置并测试连接 |
+| MCP | `/mcp` | MCP Server、工具注册、权限校验、审计记录 | 和agent交互，动态工具调用 |
+| skills | `/skills` | 工具分类、权限管理、审计记录 | 和agent交互，动态工具调用 |
+| 数据源 | `/datasources` | 包含Prometheus、Loki、Kubernetes、Milvus、SQL、alertmanager等的连接配置 | 前端完成，后端API正常保存，支持添加/编辑/删除/测试连接 |
+| 工具安全策略 | `/mcp_security` | 工具安全策略 | 后续实现 |
 
 
 ## 7. 智能运维专项设计
