@@ -972,7 +972,7 @@ button.small {
 
 .chatops-messages {
   min-height: 320px;
-  max-height: 430px;
+  max-height: 520px;
   overflow-y: auto;
   padding: 22px;
   display: flex;
@@ -1079,6 +1079,115 @@ button.small {
 
 .chatops-input-row button {
   min-height: 84px;
+}
+
+/* Message chips row */
+.msg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.msg-chip {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+}
+
+.msg-chip.intent {
+  color: var(--accent-cyan);
+  border-color: rgba(0, 229, 255, 0.25);
+  background: rgba(0, 229, 255, 0.06);
+}
+
+.msg-chip.warn {
+  color: var(--accent-amber);
+  border-color: rgba(255, 184, 0, 0.25);
+  background: rgba(255, 184, 0, 0.06);
+}
+
+/* Reply text */
+.chat-text {
+  line-height: 1.7;
+}
+
+/* Collapsible detail */
+.msg-detail {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+}
+
+.msg-detail-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--duration-fast) var(--ease-out-expo);
+}
+
+.msg-detail-toggle:hover {
+  color: var(--accent-cyan);
+}
+
+.msg-detail-arrow {
+  display: inline-block;
+  font-size: 0.5625rem;
+  transition: transform var(--duration-fast) var(--ease-out-expo);
+}
+
+.msg-detail-arrow.open {
+  transform: rotate(90deg);
+}
+
+.msg-detail-body {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.msg-detail-section h4 {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.msg-kv div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.msg-kv span {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--text-muted);
+}
+
+.msg-kv strong {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-primary);
 }
 
 .chatops-side {

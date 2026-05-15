@@ -2,7 +2,15 @@ import re
 
 from sqlalchemy.orm import Session
 
-NAMESPACE_PATTERN = re.compile(r"\b(default|prod|dev|test|staging|kube-system)\b", re.IGNORECASE)
+# 显式命名空间模式
+_NAMESPACE_CN_PATTERN = re.compile(r"([a-z0-9][-a-z0-9]*?)\s*命名空间", re.IGNORECASE)
+_NAMESPACE_EN_PATTERN = re.compile(r"namespace\s+['\"]?([a-z0-9][-a-z0-9]*?)['\"]?", re.IGNORECASE)
+# 已知的常见命名空间（即使没有显式标注也能识别）
+_COMMON_NAMESPACES = {"default", "prod", "dev", "test", "staging", "kube-system", "kube-public", "kube-node-lease"}
+# 通用 token 匹配
+_NAMESPACE_TOKEN_PATTERN = re.compile(r"\b([a-z][a-z0-9-]{0,253}[a-z0-9])\b", re.IGNORECASE)
+_NAMESPACE_BLACKLIST = {"error", "errors", "log", "logs", "show", "view", "check", "query", "pod", "pods", "cpu", "内存", "memory", "help", "你好"}
+
 WORKLOAD_PATTERN = re.compile(
     r"\b([a-z][a-z0-9-]*(?:api|app|demoapp|server|service|worker|gateway|web|frontend|backend)[a-z0-9-]*)\b",
     re.IGNORECASE,
@@ -103,13 +111,49 @@ def classify_intent(message: str, db: Session | None = None) -> str:
 
 def extract_entities(message: str) -> dict[str, str]:
     entities: dict[str, str] = {}
-    namespace_match = NAMESPACE_PATTERN.search(message)
-    workload_match = WORKLOAD_PATTERN.search(message)
 
-    if namespace_match:
-        entities["namespace"] = namespace_match.group(1).lower()
+    # 1. 显式命名空间模式: "xxx命名空间" 或 "namespace xxx"
+    cn_match = _NAMESPACE_CN_PATTERN.search(message)
+    en_match = _NAMESPACE_EN_PATTERN.search(message)
+    namespace_raw = None
+    if cn_match:
+        namespace_raw = cn_match.group(1)
+    elif en_match:
+        namespace_raw = en_match.group(1)
+
+    # 2. 已知常见命名空间名称（向后兼容，无需显式标注）
+    if namespace_raw is None:
+        for ns in _COMMON_NAMESPACES:
+            if re.search(rf"\b{re.escape(ns)}\b", message, re.IGNORECASE):
+                namespace_raw = ns
+                break
+
+    # 3. 宽松匹配: 在 Pod/集群上下文中提取未被黑名单拦截的 token
+    if namespace_raw is None and any(
+        kw in message.lower() for kw in ("命名空间", "namespace", "pod", "pods", "集群", "cluster", "节点", "node")
+    ):
+        for token in _NAMESPACE_TOKEN_PATTERN.findall(message):
+            if token.lower() not in _NAMESPACE_BLACKLIST and token.lower() not in _COMMON_NAMESPACES:
+                namespace_raw = token
+                break
+
+    # 4. 提取 workload
+    workload_match = WORKLOAD_PATTERN.search(message)
     if workload_match and workload_match.group(1).lower() not in IGNORED_WORKLOAD_TOKENS:
         entities["workload"] = workload_match.group(1)
+        # 如果仍未提取命名空间，尝试 workload 前的词作为命名空间
+        if namespace_raw is None:
+            before = message[:workload_match.start()].strip().split()
+            if before:
+                candidate = before[-1].rstrip("的").rstrip("了")
+                if (
+                    candidate.lower() not in _NAMESPACE_BLACKLIST
+                    and re.match(r"^[a-z][-a-z0-9]*$", candidate, re.IGNORECASE)
+                ):
+                    namespace_raw = candidate
+
+    if namespace_raw and namespace_raw.lower() not in _NAMESPACE_BLACKLIST:
+        entities["namespace"] = namespace_raw.lower()
     if "cpu" in message.lower():
         entities["metric"] = "cpu"
     if "内存" in message or "memory" in message.lower():

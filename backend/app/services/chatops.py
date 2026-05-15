@@ -15,7 +15,14 @@ def handle_chatops_message(payload: ChatOpsMessageRequest, db: Session | None = 
         session_id=result["session_id"],
         intent=result["intent"],
         entities=result["entities"],
-        reply=_build_reply(result["intent"], result["entities"], result["requires_human_approval"]),
+        reply=_build_reply(
+            result["intent"],
+            result["entities"],
+            result["requires_human_approval"],
+            llm_reply=result.get("llm_reply", ""),
+            evidence=result.get("evidence", []),
+            tool_calls=result.get("tool_calls", []),
+        ),
         trace=result["trace"],
         evidence=result["evidence"],
         tool_calls=result["tool_calls"],
@@ -103,7 +110,14 @@ def handle_chatops_message_stream(
         session_id=state["session_id"],
         intent=state["intent"],
         entities=state["entities"],
-        reply=_build_reply(state["intent"], state["entities"], state["requires_human_approval"]),
+        reply=_build_reply(
+            state["intent"],
+            state["entities"],
+            state["requires_human_approval"],
+            llm_reply="",
+            evidence=state["evidence"],
+            tool_calls=state["tool_calls"],
+        ),
         trace=state["trace"],
         evidence=state["evidence"],
         tool_calls=state["tool_calls"],
@@ -115,20 +129,43 @@ def handle_chatops_message_stream(
     yield _sse("done", final.model_dump())
 
 
-def _build_reply(intent: str, entities: dict[str, str], requires_human_approval: bool) -> str:
+def _build_reply(
+    intent: str,
+    entities: dict[str, str],
+    requires_human_approval: bool,
+    llm_reply: str = "",
+    evidence: list[dict] | None = None,
+    tool_calls: list[dict] | None = None,
+) -> str:
+    # 优先使用 LLM 生成的自然语言回复
+    if llm_reply and llm_reply.strip():
+        return llm_reply.strip()
+
+    evidence = evidence or []
+    tool_calls = tool_calls or []
+
+    # 从实际工具执行结果中提取可读信息
     namespace = entities.get("namespace") or "默认命名空间"
     workload = entities.get("workload") or "目标对象"
+
+    # 尝试从 evidence 中提取已执行的工具结果
+    mcp_evidences = [e for e in evidence if e.get("source") == "mcp" and e.get("score", 0) > 0]
+    if mcp_evidences:
+        summaries = [e.get("summary", "") for e in mcp_evidences if e.get("summary")]
+        if summaries:
+            return f"查询 {namespace} 结果:\n" + "\n".join(summaries)
+
+    if intent == "query_cluster":
+        return f"已查询 {namespace}，详见工具调用结果。"
     if intent == "query_metric":
-        return f"已识别为指标查询，将查询 {namespace} 中 {workload} 的相关指标。"
+        return f"已查询 {namespace} 中 {workload} 的指标数据。"
     if intent == "query_logs":
-        return f"已识别为日志查询，将检索 {namespace} 中 {workload} 的日志。"
+        return f"已检索 {namespace} 中 {workload} 的日志。"
     if intent == "search_runbook":
-        return "已识别为 Runbook 检索，将从知识库召回相关处理手册。"
+        return "已从知识库召回相关处理手册，详见证据列表。"
     if intent == "create_workflow":
         suffix = "该动作需要人工确认。" if requires_human_approval else ""
         return f"已识别为创建排查流程。{suffix}"
-    if intent == "query_cluster":
-        return "已识别为集群查询，将获取集群、节点和 Pod 概览。"
     if intent == "general_chat":
         return (
             "我是 KubeMind 智能运维助手，支持以下能力：\n"

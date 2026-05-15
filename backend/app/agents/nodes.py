@@ -210,7 +210,7 @@ def diagnosis_agent(state: OpsGraphState, db=None) -> OpsGraphState:
         "requires_human_approval": state["requires_human_approval"],
     })
 
-    if db is not None and state["intent"] in {"diagnose_issue", "search_runbook", "query_metric", "query_logs"}:
+    if db is not None and state["intent"] in {"diagnose_issue", "search_runbook", "query_metric", "query_logs", "query_cluster"}:
         try:
             from app.services.llm import chat_completion
 
@@ -329,8 +329,30 @@ def _summarize_tool_result(result: dict[str, Any]) -> str:
     if not result.get("success"):
         return str(result.get("error") or "tool execution failed")
     payload = result.get("result", {})
-    if isinstance(payload, dict) and "logs" in payload:
-        return str(payload.get("logs", ""))[:500]
+    if isinstance(payload, dict):
+        # 格式化 Pod 列表
+        if "items" in payload:
+            items = payload["items"]
+            if not items:
+                return "查询结果为空，未找到匹配资源。"
+            lines = []
+            for item in items[:20]:
+                name = item.get("name", "-")
+                ns = item.get("namespace", "")
+                status = item.get("status", "")
+                node = item.get("node", "")
+                extra = f" namespace={ns}" if ns else ""
+                extra += f" node={node}" if node else ""
+                lines.append(f"  - {name} [{status}]{extra}")
+            suffix = f"\n  ... 以及其他 {len(items) - 20} 个资源" if len(items) > 20 else ""
+            return f"共 {len(items)} 个资源:\n" + "\n".join(lines) + suffix
+        # 格式化关键字段
+        if "logs" in payload:
+            return str(payload["logs"])[:500]
+        if "query" in payload or "result_type" in payload:
+            return json.dumps(payload, ensure_ascii=False, default=str)[:500]
+    if isinstance(payload, list):
+        return f"返回 {len(payload)} 条记录"
     return json.dumps(payload, ensure_ascii=False, default=str)[:500]
 
 
