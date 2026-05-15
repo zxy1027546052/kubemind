@@ -21,6 +21,15 @@ def run_ops_graph(state: OpsGraphState) -> OpsGraphState:
 
 
 def run_ops_graph_with_db(state: OpsGraphState, db=None) -> OpsGraphState:
+    """Run the ops pipeline. Uses LangGraph if available, falls back to sequential."""
+    try:
+        from app.agents.langgraph_flow import run_ops_graph_langgraph
+        return run_ops_graph_langgraph(state, db=db)
+    except Exception:
+        return _run_sequential(state, db=db)
+
+
+def _run_sequential(state: OpsGraphState, db=None) -> OpsGraphState:
     state = planner_agent(state, db=db)
     state = retriever_agent(state)
     state = milvus_agent(state, db=db)

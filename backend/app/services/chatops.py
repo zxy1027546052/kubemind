@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.graph import run_ops_graph_with_db
 from app.agents.state import create_initial_state
+from app.runtime import SessionRuntime
 from app.schemas.chatops import ChatOpsMessageRequest, ChatOpsMessageResponse
 
 
@@ -36,7 +37,7 @@ def handle_chatops_message(payload: ChatOpsMessageRequest, db: Session | None = 
 def handle_chatops_message_stream(
     payload: ChatOpsMessageRequest, db: Session | None = None
 ) -> Generator[str, None, None]:
-    """Run the agent graph and yield SSE events as agents progress."""
+    """Run the agent graph and yield structured SSE events via Runtime Layer."""
     from app.agents.nodes import (
         diagnosis_agent,
         mcp_ops_agent,
@@ -48,28 +49,82 @@ def handle_chatops_message_stream(
     from app.services.llm import chat_completion_stream
 
     state = create_initial_state(session_id=payload.session_id, user_query=payload.message)
+    runtime = SessionRuntime(state["session_id"])
 
     # --- Planner ---
-    state = planner_agent(state, db=db)
-    yield _sse("agent_done", {"agent": "PlannerAgent", "intent": state["intent"], "entities": state["entities"]})
+    exec_planner = runtime.agent_runtime.start_agent("PlannerAgent", {"query": state["user_query"]})
+    yield _sse_event(runtime, "agent.started")
+    try:
+        state = planner_agent(state, db=db)
+        runtime.agent_runtime.complete_agent(exec_planner, {"intent": state["intent"], "entities": state["entities"]})
+    except Exception as e:
+        runtime.agent_runtime.fail_agent(exec_planner, str(e))
+    yield _sse_event(runtime, "agent.completed")
 
     # --- Retriever ---
-    state = retriever_agent(state)
-    yield _sse("agent_done", {"agent": "RetrieverAgent"})
+    exec_retriever = runtime.agent_runtime.start_agent("RetrieverAgent")
+    yield _sse_event(runtime, "agent.started")
+    try:
+        state = retriever_agent(state)
+        runtime.agent_runtime.complete_agent(exec_retriever)
+    except Exception as e:
+        runtime.agent_runtime.fail_agent(exec_retriever, str(e))
+    yield _sse_event(runtime, "agent.completed")
 
     # --- Milvus ---
-    state = milvus_agent(state, db=db)
-    yield _sse("agent_done", {"agent": "MilvusAgent", "evidence_count": len(state["evidence"])})
+    exec_milvus = runtime.agent_runtime.start_agent("MilvusAgent")
+    yield _sse_event(runtime, "agent.started")
+    try:
+        state = milvus_agent(state, db=db)
+        runtime.agent_runtime.complete_agent(exec_milvus, {"evidence_count": len(state["evidence"])})
+    except Exception as e:
+        runtime.agent_runtime.fail_agent(exec_milvus, str(e))
+    yield _sse_event(runtime, "agent.completed")
 
     # --- Observability ---
-    state = observability_agent(state)
-    yield _sse("agent_done", {"agent": "ObservabilityAgent"})
+    exec_obs = runtime.agent_runtime.start_agent("ObservabilityAgent")
+    yield _sse_event(runtime, "agent.started")
+    try:
+        state = observability_agent(state)
+        runtime.agent_runtime.complete_agent(exec_obs)
+    except Exception as e:
+        runtime.agent_runtime.fail_agent(exec_obs, str(e))
+    yield _sse_event(runtime, "agent.completed")
 
     # --- MCP Ops Tools ---
-    state = mcp_ops_agent(state, db=db)
-    yield _sse("agent_done", {"agent": "McpOpsAgent", "tool_call_count": len(state["tool_calls"])})
+    exec_mcp = runtime.agent_runtime.start_agent("McpOpsAgent")
+    yield _sse_event(runtime, "agent.started")
+    try:
+        state = mcp_ops_agent(state, db=db)
+        runtime.agent_runtime.complete_agent(exec_mcp, {"tool_call_count": len(state["tool_calls"])})
+        for tc in state["tool_calls"]:
+            tool_exec = runtime.tool_runtime.start_tool(
+                tc.get("tool", "unknown"), exec_mcp.id, tc,
+            )
+            if tc.get("status") == "executed":
+                runtime.tool_runtime.complete_tool(tool_exec, tc.get("result", ""))
+            elif tc.get("status") == "error":
+                runtime.tool_runtime.fail_tool(tool_exec, tc.get("error", ""))
+            else:
+                runtime.tool_runtime.complete_tool(tool_exec)
+    except Exception as e:
+        runtime.agent_runtime.fail_agent(exec_mcp, str(e))
+    yield _sse_event(runtime, "agent.completed")
+
+    # Emit evidence summary
+    if state["evidence"]:
+        for ev in state["evidence"][-5:]:
+            runtime.emit("evidence.added", {
+                "source": ev.get("source", ""),
+                "title": ev.get("title", ""),
+                "summary": ev.get("summary", ""),
+            })
+        yield _sse_event(runtime, "evidence.added")
 
     # --- Diagnosis with streaming LLM ---
+    exec_diag = runtime.agent_runtime.start_agent("DiagnosisAgent")
+    yield _sse_event(runtime, "agent.started")
+
     if db and state["intent"] in {"diagnose_issue", "search_runbook", "query_metric", "query_logs"}:
         evidence_text = "\n".join(
             f"[{e.get('source', '')}] {e.get('title', '')}: {e.get('summary', '')}"
@@ -101,11 +156,17 @@ def handle_chatops_message_stream(
     else:
         yield _sse("token", {"content": ""})
 
-    # Build rule-based fallback diagnosis
-    state = diagnosis_agent(state, db=None)  # don't call LLM again, already streamed
-    state["llm_reply"] = ""  # already streamed token-by-token
+    state = diagnosis_agent(state, db=None)
+    state["llm_reply"] = ""
+    runtime.agent_runtime.complete_agent(exec_diag, {"root_causes": state["root_causes"]})
 
-    # --- Final done event ---
+    if state["root_causes"]:
+        runtime.emit("diagnosis.updated", {
+            "root_causes": state["root_causes"],
+            "remediation_plan": state["remediation_plan"],
+        })
+
+    # --- Final done event with runtime trace ---
     final = ChatOpsMessageResponse(
         session_id=state["session_id"],
         intent=state["intent"],
@@ -126,7 +187,18 @@ def handle_chatops_message_stream(
         requires_human_approval=state["requires_human_approval"],
         llm_reply="",
     )
-    yield _sse("done", final.model_dump())
+    done_data = final.model_dump()
+    done_data["runtime_trace"] = runtime.get_trace()
+    yield _sse("done", done_data)
+    runtime.cleanup()
+
+
+def _sse_event(runtime: SessionRuntime, _event_hint: str) -> str:
+    """Yield the most recent event from the runtime event bus as SSE."""
+    events = runtime.event_bus.events
+    if events:
+        return events[-1].to_sse()
+    return ""
 
 
 def _build_reply(
