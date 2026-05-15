@@ -17,11 +17,11 @@ const aiItems: NavItem[] = [
   { path: '/knowledge', label: '知识中心', icon: '▣' },
   { path: '/chatops', label: '对话运维', icon: '▤' },
   { path: '/workflows', label: '工作流', icon: '▻' },
-  { path: '/models', label: 'AI 模型', icon: '◉' },
 ];
 
 const systemItems: NavItem[] = [
   { path: '/settings', label: '系统配置', icon: '⚙' },
+  { path: '/models', label: '模型服务', icon: '◉' },
 ];
 
 function NavSection({ title, items }: { title: string; items: NavItem[] }) {

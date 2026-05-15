@@ -38,6 +38,8 @@ export default function KnowledgeCenter() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [viewDoc, setViewDoc] = useState<Document | SearchResult | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -183,13 +185,13 @@ export default function KnowledgeCenter() {
               {isSearching ? <th>相关度</th> : <th>分类</th>}
               {!isSearching && <th>大小</th>}
               <th>创建时间</th>
-              {!isSearching && <th>操作</th>}
+              <th style={{ width: 140 }}>操作</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={isSearching ? 4 : 6} style={{ textAlign: 'center', padding: '40px' }}>
+                <td colSpan={isSearching ? 5 : 7} style={{ textAlign: 'center', padding: '40px' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
                     搜索中<span style={{ animation: 'cursor-blink 1s step-end infinite' }}>_</span>
                   </span>
@@ -198,7 +200,7 @@ export default function KnowledgeCenter() {
             ) : isSearching ? (
               searchResults.length === 0 ? (
                 <tr>
-                  <td colSpan={4}>
+                  <td colSpan={5}>
                     <div className="empty-state">
                       <div className="empty-icon">[?]</div>
                       <h3>未找到匹配结果</h3>
@@ -217,12 +219,17 @@ export default function KnowledgeCenter() {
                     </td>
                     <td className="col-mono">{Math.round(r.score * 100)}%</td>
                     <td className="col-mono">-</td>
+                    <td>
+                      <div className="table-actions">
+                        <button className="small" onClick={() => { setViewDoc(r); setShowViewModal(true); }}>查看</button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )
             ) : documents.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <div className="empty-state">
                     <div className="empty-icon">[ ]</div>
                     <h3>暂无文档</h3>
@@ -241,9 +248,10 @@ export default function KnowledgeCenter() {
                   <td className="col-mono">{doc.size || '-'}</td>
                   <td className="col-mono">{formatDate(doc.created_at)}</td>
                   <td>
-                    <button className="danger" onClick={() => handleDelete(doc.id)}>
-                      删除
-                    </button>
+                    <div className="table-actions">
+                      <button className="small" onClick={() => { setViewDoc(doc); setShowViewModal(true); }}>查看</button>
+                      <button className="danger" onClick={() => handleDelete(doc.id)}>删除</button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -266,6 +274,81 @@ export default function KnowledgeCenter() {
           </div>
         )}
       </div>
+
+      {/* View Modal */}
+      {showViewModal && viewDoc && (
+        <div className="modal-overlay" onClick={() => { setShowViewModal(false); setViewDoc(null); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <div className="modal-header">
+              <h2>文档详情</h2>
+              <button className="modal-close" onClick={() => { setShowViewModal(false); setViewDoc(null); }}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>标题</label>
+                <div className="view-field">{viewDoc.title}</div>
+              </div>
+              {'type' in viewDoc && viewDoc.type && (
+                <div className="form-group">
+                  <label>类型</label>
+                  <div className="view-field">
+                    <span className={`tag ${getTagClass(viewDoc.type)}`}>{viewDoc.type}</span>
+                  </div>
+                </div>
+              )}
+              {'source_type' in viewDoc && viewDoc.source_type && (
+                <div className="form-group">
+                  <label>来源</label>
+                  <div className="view-field">
+                    <span className={`tag ${getTagClass(viewDoc.source_type === 'runbooks' ? 'Runbook' : viewDoc.source_type === 'cases' ? '案例' : '文档')}`}>
+                      {viewDoc.source_type === 'runbooks' ? 'Runbook' : viewDoc.source_type === 'cases' ? '案例' : '文档'}
+                    </span>
+                  </div>
+                </div>
+              )}
+              {'score' in viewDoc && (
+                <div className="form-group">
+                  <label>相关度</label>
+                  <div className="view-field">{Math.round(viewDoc.score * 100)}%</div>
+                </div>
+              )}
+              {'category' in viewDoc && viewDoc.category && (
+                <div className="form-group">
+                  <label>分类</label>
+                  <div className="view-field">{viewDoc.category}</div>
+                </div>
+              )}
+              {'size' in viewDoc && viewDoc.size && (
+                <div className="form-group">
+                  <label>大小</label>
+                  <div className="view-field">{viewDoc.size}</div>
+                </div>
+              )}
+              {'created_at' in viewDoc && (
+                <div className="form-group">
+                  <label>创建时间</label>
+                  <div className="view-field">{formatDate(viewDoc.created_at)}</div>
+                </div>
+              )}
+              {'updated_at' in viewDoc && viewDoc.updated_at && (
+                <div className="form-group">
+                  <label>更新时间</label>
+                  <div className="view-field">{formatDate(viewDoc.updated_at)}</div>
+                </div>
+              )}
+              {'content' in viewDoc && viewDoc.content && (
+                <div className="form-group">
+                  <label>内容</label>
+                  <pre className="view-content">{viewDoc.content}</pre>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => { setShowViewModal(false); setViewDoc(null); }}>关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload Modal */}
       {showModal && (
