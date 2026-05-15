@@ -183,6 +183,58 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  // MCP / Tools
+  listMCPServers: () => request<MCPServerListResponse>('/mcp/servers'),
+
+  getMCPServer: (id: number) => request<MCPServer>(`/mcp/servers/${id}`),
+
+  createMCPServer: (data: Partial<MCPServer>) =>
+    request<MCPServer>('/mcp/servers', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateMCPServer: (id: number, data: Partial<MCPServer>) =>
+    request<MCPServer>(`/mcp/servers/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteMCPServer: (id: number) => request<void>(`/mcp/servers/${id}`, { method: 'DELETE' }),
+
+  listTools: (params?: { category?: string; risk_level?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.category) sp.set('category', params.category);
+    if (params?.risk_level) sp.set('risk_level', params.risk_level);
+    const qs = sp.toString();
+    return request<ToolListResponse>(`/mcp/tools${qs ? `?${qs}` : ''}`);
+  },
+
+  createTool: (data: ToolCreate) =>
+    request<Tool>('/mcp/tools', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateTool: (id: number, data: Partial<Tool>) =>
+    request<Tool>(`/mcp/tools/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteTool: (id: number) => request<void>(`/mcp/tools/${id}`, { method: 'DELETE' }),
+
+  executeTool: (data: ToolExecuteRequest) =>
+    request<ToolExecuteResponse>('/mcp/tools/execute', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listAuditRecords: (params?: { tool_name?: string; session_id?: string; offset?: number; limit?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.tool_name) sp.set('tool_name', params.tool_name);
+    if (params?.session_id) sp.set('session_id', params.session_id);
+    if (params?.offset !== undefined) sp.set('offset', String(params.offset));
+    if (params?.limit !== undefined) sp.set('limit', String(params.limit));
+    const qs = sp.toString();
+    return request<AuditListResponse>(`/mcp/audit${qs ? `?${qs}` : ''}`);
+  },
+
+  getAuditRecord: (id: number) => request<AuditRecordResponse>(`/mcp/audit/${id}`),
+
+  listPolicies: () => request<PolicyListResponse>('/mcp/policies'),
+
+  updatePolicy: (id: number, data: Partial<SecurityPolicy>) =>
+    request<SecurityPolicy>(`/mcp/policies/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
 export interface SearchResult {
@@ -460,4 +512,133 @@ export interface ChatOpsMessageResponse {
   root_causes: ChatOpsRootCause[];
   remediation_plan: ChatOpsRemediationStep[];
   requires_human_approval: boolean;
+}
+
+// --- MCP / Tools ---
+
+export interface MCPServer {
+  id: number;
+  name: string;
+  type: string;
+  status: 'online' | 'offline' | 'error';
+  endpoint: string;
+  tools_count: number;
+  last_heartbeat: string;
+}
+
+export interface MCPServerCreate {
+  name: string;
+  type: string;
+  endpoint: string;
+  metadata_json?: string;
+}
+
+export interface MCPServerUpdate {
+  name?: string;
+  type?: string;
+  endpoint?: string;
+  status?: string;
+  metadata_json?: string;
+}
+
+export interface MCPServerListResponse {
+  total: number;
+  items: MCPServer[];
+}
+
+export interface Tool {
+  id: number;
+  name: string;
+  category: string;
+  risk_level: string;
+  enabled: boolean;
+  timeout_ms: number;
+  retry: number;
+  description: string;
+  mcp_server_id?: number;
+  function_name: string;
+  parameters: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ToolCreate {
+  name: string;
+  category: string;
+  risk_level: string;
+  timeout_ms: number;
+  retry: number;
+  description: string;
+  function_name: string;
+  mcp_server_id?: number;
+  parameters?: string;
+}
+
+export interface ToolUpdate {
+  name?: string;
+  category?: string;
+  risk_level?: string;
+  enabled?: boolean;
+  timeout_ms?: number;
+  retry?: number;
+  description?: string;
+  parameters?: string;
+}
+
+export interface ToolListResponse {
+  total: number;
+  items: Tool[];
+}
+
+export interface ToolExecuteRequest {
+  tool_name: string;
+  params?: Record<string, unknown>;
+  session_id?: string;
+  trace_id?: string;
+  namespace?: string;
+}
+
+export interface ToolExecuteResponse {
+  success: boolean;
+  result?: Record<string, unknown>;
+  error?: string;
+  duration_ms: number;
+  audit_id?: number;
+}
+
+export interface AuditRecordResponse {
+  id: number;
+  tool_name: string;
+  category: string;
+  caller: string;
+  session_id?: string;
+  trace_id?: string;
+  status: string;
+  duration_ms: number;
+  params: string;
+  result_summary: string;
+  error_message: string;
+  namespace: string;
+  created_at: string;
+}
+
+export interface AuditListResponse {
+  total: number;
+  items: AuditRecordResponse[];
+}
+
+export interface SecurityPolicy {
+  id: number;
+  name: string;
+  type: string;
+  enabled: boolean;
+  description: string;
+  rules: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PolicyListResponse {
+  total: number;
+  items: SecurityPolicy[];
 }

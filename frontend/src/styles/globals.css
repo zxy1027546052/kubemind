@@ -1376,3 +1376,370 @@ button.small {
     gap: 4px;
   }
 }
+
+/* ============================================================
+   MCP PAGE
+   ============================================================ */
+
+.mcp-page .page-header {
+  margin-bottom: 20px;
+}
+
+.mcp-page .page-title {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.mcp-page .page-subtitle {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.mcp-page .tabs-container {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 20px;
+}
+
+.mcp-page .tabs-container .tab {
+  padding: 14px 22px;
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--duration-fast) var(--ease-out-expo);
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+}
+
+.mcp-page .tabs-container .tab:hover {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.mcp-page .tabs-container .tab.active {
+  color: var(--accent-cyan);
+  border-bottom-color: var(--accent-cyan);
+  box-shadow: 0 1px 12px rgba(0, 229, 255, 0.1);
+}
+
+.mcp-page .content-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.mcp-page .loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+}
+
+.mcp-page .spinner {
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--accent-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.mcp-page .data-table-container {
+  overflow-x: auto;
+}
+
+/* Tool Category Section */
+.tool-category-section {
+  margin-bottom: 32px;
+}
+
+.tool-category-section:last-child {
+  margin-bottom: 0;
+}
+
+.tool-category-title {
+  font-size: 1.125rem;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.tool-card {
+  background: var(--bg-root);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  transition: all var(--duration-fast) var(--ease-out-expo);
+}
+
+.tool-card:hover {
+  border-color: rgba(0, 229, 255, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.tool-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.tool-card-name {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+}
+
+.tool-card-risk {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.tool-card-description {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.tool-card-meta {
+  display: flex;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.tool-card button {
+  width: 100%;
+}
+
+/* Policies Grid */
+.policies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.policy-card {
+  background: var(--bg-root);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.policy-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.policy-card-name {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+}
+
+.policy-card-status {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.policy-card-status.enabled {
+  color: var(--accent-green);
+  background: rgba(57, 255, 20, 0.08);
+}
+
+.policy-card-status.disabled {
+  color: var(--text-muted);
+  background: rgba(107, 114, 128, 0.08);
+}
+
+.policy-card-type {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.policy-card-description {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.policy-card-rules {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.policy-card-rules code {
+  font-family: inherit;
+}
+
+/* Status Badge */
+.status-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.status-badge.status-success {
+  color: var(--accent-green);
+  background: rgba(57, 255, 20, 0.08);
+  border: 1px solid rgba(57, 255, 20, 0.18);
+}
+
+.status-badge.status-error {
+  color: var(--accent-red);
+  background: rgba(255, 51, 102, 0.08);
+  border: 1px solid rgba(255, 51, 102, 0.18);
+}
+
+/* Modal Overrides for MCP */
+.mcp-page .modal {
+  width: 640px;
+}
+
+.mcp-page .code-textarea {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  min-height: 120px;
+}
+
+.mcp-page .code-block {
+  background: var(--bg-root);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.8;
+}
+
+.mcp-page .code-block p {
+  margin: 6px 0;
+}
+
+.mcp-page .code-block p strong {
+  color: var(--accent-cyan);
+}
+
+.mcp-page .code-block pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Buttons in MCP */
+.btn {
+  cursor: pointer;
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: all var(--duration-fast) var(--ease-out-expo);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-active);
+  background: var(--bg-surface);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+}
+
+.btn-primary {
+  background: transparent;
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+.btn-primary:hover {
+  background: rgba(0, 229, 255, 0.08);
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.25), 0 0 6px rgba(0, 229, 255, 0.4);
+}
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-active);
+}
+
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--accent-red);
+  color: var(--accent-red);
+}
+
+.btn-danger:hover {
+  background: rgba(255, 51, 102, 0.08);
+  box-shadow: 0 0 16px rgba(255, 51, 102, 0.2);
+}
+
+/* ============================================================
+   END OF FILE
+   ============================================================ */

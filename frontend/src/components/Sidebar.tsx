@@ -20,6 +20,7 @@ const aiItems: NavItem[] = [
 ];
 
 const systemItems: NavItem[] = [
+  { path: '/mcp', label: 'MCP 工具', icon: '▣' },
   { path: '/settings', label: '系统配置', icon: '⚙' },
   { path: '/models', label: '模型服务', icon: '◉' },
 ];

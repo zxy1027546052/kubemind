@@ -9,6 +9,7 @@ import ChatOps from './pages/ChatOps';
 import Workflows from './pages/Workflows';
 import Models from './pages/Models';
 import Settings from './pages/Settings';
+import MCP from './pages/MCP';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="workflows" element={<Workflows />} />
           <Route path="models" element={<Models />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="mcp" element={<MCP />} />
         </Route>
       </Routes>
     </BrowserRouter>
