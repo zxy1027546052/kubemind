@@ -25,6 +25,7 @@ interface RuntimeActions {
   reset: () => void;
   setStatus: (status: RuntimeStatus) => void;
   processServerEvent: (eventType: string, data: Record<string, unknown>) => void;
+  getCurrentTokens: () => string;
 }
 
 function formatTime(iso: string): string {
@@ -43,12 +44,14 @@ const initialState: RuntimeState = {
   events: [],
 };
 
-export const useRuntimeStore = create<RuntimeState & RuntimeActions>((set) => ({
+export const useRuntimeStore = create<RuntimeState & RuntimeActions>((set, get) => ({
   ...initialState,
 
   reset: () => set(initialState),
 
   setStatus: (status) => set({ status }),
+
+  getCurrentTokens: () => get().streamedTokens,
 
   processServerEvent: (eventType, data) => {
     const timestamp = (data.timestamp as string) || new Date().toISOString();

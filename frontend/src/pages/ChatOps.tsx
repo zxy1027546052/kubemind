@@ -109,10 +109,10 @@ function TimelinePanel({ entries, status }: { entries: { time: string; type: str
 function ChatOpsInner() {
   const {
     sessionId, messages, input, loading, error, expanded, useStream,
-    setInput, addMessage, setLoading, setError, toggleExpand, setUseStream, reset: resetChat,
+    setInput, addMessage, setLoading, setError, toggleExpand, setUseStream,
   } = useChatOpsStore();
 
-  const { status, timeline, streamedTokens, reset: resetRuntime, processServerEvent, setStatus } = useRuntimeStore();
+  const { status, timeline, reset: resetRuntime, processServerEvent, setStatus, getCurrentTokens } = useRuntimeStore();
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -125,7 +125,6 @@ function ChatOpsInner() {
     addMessage({ role: 'user', content: text });
     setInput('');
     resetRuntime();
-    resetChat();
 
     try {
       if (useStream) {
@@ -174,7 +173,7 @@ function ChatOpsInner() {
         }
 
         setStatus('completed');
-        const reply = streamedTokens || finalResult?.reply || '';
+        const reply = getCurrentTokens() || finalResult?.reply || '';
         addMessage({ role: 'assistant', content: reply, result: finalResult || undefined });
       } else {
         const result = await api.sendChatOpsMessage({ session_id: sessionId, message: text });
@@ -190,7 +189,7 @@ function ChatOpsInner() {
     } finally {
       setLoading(false);
     }
-  }, [input, loading, useStream, sessionId, streamedTokens, setInput, addMessage, setLoading, setError, resetRuntime, resetChat, processServerEvent, setStatus]);
+  }, [input, loading, useStream, sessionId, setInput, addMessage, setLoading, setError, resetRuntime, processServerEvent, setStatus, getCurrentTokens]);
 
   function renderDetail(result: ChatOpsMessageResponse, index: number) {
     const isExpanded = expanded.has(index);
@@ -373,11 +372,11 @@ function ChatOpsInner() {
                 </div>
               ))
             )}
-            {loading && streamedTokens && (
+            {loading && getCurrentTokens() && (
               <div className="chat-message assistant">
                 <div className="chat-role">kubemind</div>
                 <div className="chat-bubble">
-                  <div className="chat-text streaming">{streamedTokens}<span className="cursor" /></div>
+                  <div className="chat-text streaming">{getCurrentTokens()}<span className="cursor" /></div>
                 </div>
               </div>
             )}

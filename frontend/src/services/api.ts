@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   ChatOpsMessageResponseSchema,
   ToolExecuteResponseSchema,
+  TestServerResponseSchema,
   parseSchema,
 } from '../schemas';
 
@@ -244,6 +245,12 @@ export const api = {
 
   updatePolicy: (id: number, data: Partial<SecurityPolicy>) =>
     request<SecurityPolicy>(`/mcp/policies/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  testMCPServer: (endpoint: string) =>
+    request<TestServerResponse>('/mcp/servers/test', {
+      method: 'POST',
+      body: JSON.stringify({ endpoint }),
+    }, TestServerResponseSchema),
 };
 
 export interface SearchResult {
@@ -613,6 +620,14 @@ export interface ToolExecuteResponse {
   error?: string;
   duration_ms: number;
   audit_id?: number;
+}
+
+export interface TestServerResponse {
+  success: boolean;
+  status_code?: number | null;
+  response_time_ms?: number | null;
+  message: string;
+  error?: string | null;
 }
 
 export interface AuditRecordResponse {

@@ -139,3 +139,14 @@ class SecurityPolicyResponse(SecurityPolicyBase):
 class PolicyListResponse(BaseModel):
     total: int
     items: List[SecurityPolicyResponse]
+
+# Test Server Connection
+class TestServerRequest(BaseModel):
+    endpoint: str = Field(..., description="服务器端点地址")
+
+class TestServerResponse(BaseModel):
+    success: bool
+    status_code: Optional[int] = Field(None, description="HTTP 状态码")
+    response_time_ms: Optional[int] = Field(None, description="响应时间（毫秒）")
+    message: str = Field(..., description="测试结果消息")
+    error: Optional[str] = Field(None, description="错误信息")

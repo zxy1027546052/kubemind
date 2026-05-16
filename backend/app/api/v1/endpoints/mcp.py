@@ -8,7 +8,8 @@ from app.schemas.mcp import (
     ToolResponse, ToolCreate, ToolUpdate, ToolListResponse,
     ToolExecuteRequest, ToolExecuteResponse,
     AuditRecordResponse, AuditListResponse,
-    SecurityPolicyResponse, SecurityPolicyUpdate, PolicyListResponse
+    SecurityPolicyResponse, SecurityPolicyUpdate, PolicyListResponse,
+    TestServerRequest, TestServerResponse
 )
 from app.services.mcp import MCPService
 
@@ -150,3 +151,8 @@ def update_policy(id: int, data: SecurityPolicyUpdate, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Policy not found")
     db.commit()
     return policy
+
+@router.post("/mcp/servers/test", response_model=TestServerResponse)
+def test_server(data: TestServerRequest):
+    """测试 MCP 服务器连接"""
+    return mcp_service.test_server_connection(data.endpoint)

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import time
+import requests
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -231,3 +232,26 @@ class MCPService:
 
     def update_policy(self, db: Session, id: int, data: SecurityPolicyUpdate) -> Optional[SecurityPolicy]:
         return self.policy_repo.update(db, id, data)
+
+    def test_server_connection(self, endpoint: str) -> Dict[str, Any]:
+        """测试 MCP 服务器连接"""
+        start_time = time.time()
+        try:
+            res = requests.get(endpoint, timeout=10)
+            response_time_ms = int((time.time() - start_time) * 1000)
+            return {
+                "success": res.ok,
+                "status_code": res.status_code,
+                "response_time_ms": response_time_ms,
+                "message": f"HTTP {res.status_code} - {res.reason}" if res.ok else f"HTTP {res.status_code} - {res.reason}",
+                "error": None,
+            }
+        except requests.exceptions.RequestException as e:
+            response_time_ms = int((time.time() - start_time) * 1000)
+            return {
+                "success": False,
+                "status_code": None,
+                "response_time_ms": response_time_ms,
+                "message": str(e),
+                "error": str(e),
+            }

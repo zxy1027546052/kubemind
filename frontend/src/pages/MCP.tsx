@@ -113,8 +113,9 @@ function MCPInner() {
 
   async function handleTestServer(server: MCPServer) {
     try {
-      const res = await fetch(server.endpoint, { method: 'GET' });
-      setNotice(`${server.name}: HTTP ${res.status}`);
+      const result = await api.testMCPServer(server.endpoint);
+      const timeInfo = result.response_time_ms ? ` (${result.response_time_ms}ms)` : '';
+      setNotice(`${server.name}: ${result.message}${timeInfo}`);
     } catch (err) {
       setNotice(`${server.name}: ${err instanceof Error ? err.message : 'connection failed'}`);
     }
