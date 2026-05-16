@@ -1,19 +1,21 @@
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app.agents.intent import classify_intent, extract_entities
+from app.agents.intent import classify_intent, classify_intents, extract_entities
 from app.agents.state import OpsGraphState
 from app.services.vector_search import search_similar
 
 
 def planner_agent(state: OpsGraphState, db=None) -> OpsGraphState:
-    intent = classify_intent(state["user_query"], db=db)
-    entities = extract_entities(state["user_query"])
-    state["intent"] = intent
+    intents = classify_intents(state["user_query"], db=db)
+    state["intents"] = intents
+    state["intent"] = intents[0]
+    entities = extract_entities(state["user_query"], db=db, history=state.get("conversation_history"))
     state["entities"].update(entities)
-    state["requires_human_approval"] = intent in {"create_workflow", "scale_recommendation"}
-    _append_trace(state, "PlannerAgent", f"intent={intent}")
+    state["requires_human_approval"] = state["intent"] in {"create_workflow", "scale_recommendation"}
+    _append_trace(state, "PlannerAgent", f"intents={intents}, entities={entities}")
     return state
 
 
@@ -147,7 +149,7 @@ def mcp_ops_agent(state: OpsGraphState, db=None, mcp_service=None) -> OpsGraphSt
         state["evidence"].append({
             "source": "mcp",
             "title": f"{request['tool_name']} {status}",
-            "summary": _summarize_tool_result(result),
+            "summary": _structure_tool_result(result, request["tool_name"]),
             "score": 1.0 if result.get("success") else 0.0,
         })
         if result.get("success"):
@@ -326,34 +328,98 @@ def _build_loki_query(namespace: str, workload: str) -> str:
 
 
 def _summarize_tool_result(result: dict[str, Any]) -> str:
+    return _structure_tool_result(result, "")
+
+
+def _structure_tool_result(result: dict[str, Any], tool_name: str) -> str:
     if not result.get("success"):
-        return str(result.get("error") or "tool execution failed")
+        return f"ERROR: {result.get('error') or 'tool execution failed'}"
     payload = result.get("result", {})
+
     if isinstance(payload, dict):
-        # 格式化 Pod 列表
         if "items" in payload:
-            items = payload["items"]
-            if not items:
-                return "查询结果为空，未找到匹配资源。"
-            lines = []
-            for item in items[:20]:
-                name = item.get("name", "-")
-                ns = item.get("namespace", "")
-                status = item.get("status", "")
-                node = item.get("node", "")
-                extra = f" namespace={ns}" if ns else ""
-                extra += f" node={node}" if node else ""
-                lines.append(f"  - {name} [{status}]{extra}")
-            suffix = f"\n  ... 以及其他 {len(items) - 20} 个资源" if len(items) > 20 else ""
-            return f"共 {len(items)} 个资源:\n" + "\n".join(lines) + suffix
-        # 格式化关键字段
+            return _format_pod_or_event_list(payload["items"], tool_name)
         if "logs" in payload:
-            return str(payload["logs"])[:500]
+            return _extract_diagnostic_lines(str(payload["logs"]), 3000)
+        if "entries" in payload:
+            entries = payload["entries"]
+            if isinstance(entries, list):
+                lines = "\n".join(
+                    e.get("line", "") if isinstance(e, dict) else str(e)
+                    for e in entries[:100]
+                )
+                return _extract_diagnostic_lines(lines, 3000)
+            return str(entries)[:3000]
         if "query" in payload or "result_type" in payload:
-            return json.dumps(payload, ensure_ascii=False, default=str)[:500]
+            return json.dumps(payload, ensure_ascii=False, default=str)[:2000]
     if isinstance(payload, list):
-        return f"返回 {len(payload)} 条记录"
-    return json.dumps(payload, ensure_ascii=False, default=str)[:500]
+        return f"返回 {len(payload)} 条记录:\n" + json.dumps(payload[:20], ensure_ascii=False, default=str)[:3000]
+    return json.dumps(payload, ensure_ascii=False, default=str)[:4000]
+
+
+def _format_pod_or_event_list(items: list, tool_name: str) -> str:
+    if not items:
+        return "查询结果为空，未找到匹配资源。"
+
+    if tool_name == "k8s_get_events":
+        warnings = [i for i in items if i.get("type") == "Warning" or i.get("reason") in ("Failed", "BackOff", "Unhealthy", "OOMKilling", "Evicted")]
+        normal_count = len(items) - len(warnings)
+        lines = []
+        for ev in warnings[:30]:
+            reason = ev.get("reason", "")
+            msg = ev.get("message", "")
+            obj = ev.get("involved_object", ev.get("name", ""))
+            lines.append(f"  [Warning] {reason}: {msg} (object={obj})")
+        summary = f"共 {len(items)} 个事件 ({len(warnings)} Warning, {normal_count} Normal)"
+        if lines:
+            summary += ":\n" + "\n".join(lines)
+        return summary[:4000]
+
+    non_running = [i for i in items if i.get("status", "").lower() not in ("running", "succeeded")]
+    running_count = len(items) - len(non_running)
+    lines = []
+    for pod in non_running[:30]:
+        name = pod.get("name", "-")
+        ns = pod.get("namespace", "")
+        status = pod.get("status", "")
+        restarts = pod.get("restarts", pod.get("restart_count", ""))
+        node = pod.get("node", "")
+        line = f"  - {name} [{status}]"
+        if ns:
+            line += f" ns={ns}"
+        if restarts:
+            line += f" restarts={restarts}"
+        if node:
+            line += f" node={node}"
+        lines.append(line)
+    summary = f"共 {len(items)} 个 Pod ({running_count} Running, {len(non_running)} 异常)"
+    if lines:
+        summary += ":\n" + "\n".join(lines)
+    return summary[:4000]
+
+
+_DIAGNOSTIC_PATTERNS = re.compile(
+    r"(error|exception|panic|oom|timeout|fatal|crash|kill|fail|refused|unavailable|backoff)",
+    re.IGNORECASE,
+)
+
+
+def _extract_diagnostic_lines(text: str, max_chars: int) -> str:
+    lines = text.split("\n")
+    diagnostic_lines: list[str] = []
+    for i, line in enumerate(lines):
+        if _DIAGNOSTIC_PATTERNS.search(line):
+            start = max(0, i - 1)
+            end = min(len(lines), i + 2)
+            for j in range(start, end):
+                if lines[j] not in diagnostic_lines:
+                    diagnostic_lines.append(lines[j])
+    if diagnostic_lines:
+        result = f"[诊断相关行 {len(diagnostic_lines)}/{len(lines)} 总行]:\n" + "\n".join(diagnostic_lines)
+        return result[:max_chars]
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + f"\n... (截断，共 {len(lines)} 行)"
 
 
 def _normalize_vector_query(query: str) -> str:

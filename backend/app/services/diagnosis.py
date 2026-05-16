@@ -48,7 +48,7 @@ def _try_llm_diagnosis(db: Session, query: str, matches: list[dict]) -> Diagnosi
 
     context_parts = []
     for m in matches[:3]:
-        context_parts.append(f"[{m['source_type']}] {m['title']} (相关度: {m['score']:.0%})")
+        context_parts.append(f"[{m['source_type']}] {m['title']} (置信度: {m['score']:.0%})")
     context = "\n".join(context_parts) if context_parts else "无相关知识匹配"
 
     prompt = f"""你是一位资深的云原生运维专家。请根据以下故障描述和知识库参考，生成结构化的诊断报告。
@@ -63,7 +63,7 @@ def _try_llm_diagnosis(db: Session, query: str, matches: list[dict]) -> Diagnosi
 - root_causes: 可能的根因列表 (至少 1 条)
 - steps: 排查步骤列表 (按顺序，每步以数字开头)
 - impact: 影响评估 (1-2 句话)
-- runbook_refs: 建议参考的 Runbook 列表，每个条目为 {{"id": 整数, "title": "标题", "score": 相关度数值}} (从知识库参考中提取)
+- runbook_refs: 建议参考的 Runbook 列表，每个条目为 {{"id": 整数, "title": "标题", "score": 置信度数值}} (从知识库参考中提取)
 
 只输出 JSON，不要有其他文字。"""
 

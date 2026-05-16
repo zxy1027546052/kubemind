@@ -1,3 +1,4 @@
+import json
 import re
 
 from sqlalchemy.orm import Session
@@ -109,7 +110,87 @@ def classify_intent(message: str, db: Session | None = None) -> str:
     return "general_chat"
 
 
-def extract_entities(message: str) -> dict[str, str]:
+def classify_intents(message: str, db: Session | None = None) -> list[str]:
+    """Detect all applicable intents for a message (supports compound queries)."""
+    intents = _classify_all_by_keywords(message)
+
+    if not intents and db is not None:
+        llm_intents = _classify_multi_by_llm(message, db)
+        if llm_intents:
+            return llm_intents
+
+    if not intents:
+        single = classify_intent(message, db=db)
+        return [single]
+
+    return intents
+
+
+def _classify_all_by_keywords(message: str) -> list[str]:
+    """Scan for ALL matching intents without early return."""
+    text = message.lower()
+    intents: list[str] = []
+
+    if any(kw in text for kw in _GENERAL_CHAT_KEYWORDS):
+        return ["general_chat"]
+
+    if any(kw in text for kw in ("生成排查流程", "创建流程", "create workflow")):
+        intents.append("create_workflow")
+    if any(kw in text for kw in _FAULT_KEYWORDS):
+        intents.append("diagnose_issue")
+    if any(kw in text for kw in ("日志", "log", "错误日志")):
+        intents.append("query_logs")
+    if any(kw in text for kw in ("cpu", "内存", "memory", "指标", "metric")):
+        intents.append("query_metric")
+    if any(kw in text for kw in ("milvus", "向量库", "向量数据库", "vector", "runbook", "手册", "处理手册", "知识库")):
+        intents.append("search_runbook")
+    if any(kw in text for kw in ("集群", "节点", "pod")):
+        intents.append("query_cluster")
+
+    return list(dict.fromkeys(intents))
+
+
+def _classify_multi_by_llm(message: str, db: Session) -> list[str]:
+    """LLM-based multi-intent classification."""
+    try:
+        from app.services.llm import chat_completion
+
+        prompt = (
+            "你是意图分类器。用户消息可能包含多个意图，请列出所有适用的意图。\n"
+            "可选意图: query_metric, query_logs, diagnose_issue, search_runbook, "
+            "create_workflow, query_cluster, general_chat\n\n"
+            "规则：\n"
+            "- 如果用户同时想查指标和日志，返回两个意图\n"
+            "- 如果用户描述故障并想看日志，返回 diagnose_issue,query_logs\n"
+            "- 用逗号分隔多个意图，不要空格\n"
+            "- 只输出意图名称，不要其他文字\n\n"
+            f"用户消息：{message}"
+        )
+        result = chat_completion(
+            db,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=64,
+        )
+        raw = result.strip().lower().replace('"', "").replace("'", "")
+        candidates = [i.strip() for i in raw.split(",")]
+        valid = [i for i in candidates if i in _VALID_INTENTS]
+        return valid if valid else []
+    except Exception:
+        return []
+
+
+def extract_entities(message: str, db: Session | None = None, history: list[dict[str, str]] | None = None) -> dict[str, str]:
+    entities = _extract_entities_by_regex(message)
+
+    if not entities.get("workload") and db is not None:
+        llm_entities = _extract_entities_by_llm(message, db, history)
+        entities.update({k: v for k, v in llm_entities.items() if v})
+
+    return entities
+
+
+def _extract_entities_by_regex(message: str) -> dict[str, str]:
     entities: dict[str, str] = {}
 
     # 1. 显式命名空间模式: "xxx命名空间" 或 "namespace xxx"
@@ -159,3 +240,40 @@ def extract_entities(message: str) -> dict[str, str]:
     if "内存" in message or "memory" in message.lower():
         entities["metric"] = "memory"
     return entities
+
+
+def _extract_entities_by_llm(
+    message: str, db: Session, history: list[dict[str, str]] | None = None
+) -> dict[str, str]:
+    try:
+        from app.services.llm import chat_completion
+
+        history_text = ""
+        if history:
+            recent = history[-4:]
+            history_text = "\n".join(
+                f"{m['role']}: {m['content']}" for m in recent
+            )
+
+        prompt = (
+            "从用户消息中提取 Kubernetes 运维相关实体。如果消息中有指代词（它、这个服务等），"
+            "请根据对话历史推断实际指代的对象。\n\n"
+        )
+        if history_text:
+            prompt += f"对话历史:\n{history_text}\n\n"
+        prompt += (
+            f"当前消息: {message}\n\n"
+            "请以 JSON 格式返回，只包含能确定的字段:\n"
+            '{"workload": "服务/Pod名称", "namespace": "命名空间", "metric": "cpu或memory"}\n'
+            "如果无法确定某个字段，该字段值设为空字符串。只输出 JSON，不要其他文字。"
+        )
+        result = chat_completion(
+            db,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=128,
+        )
+        parsed = json.loads(result.strip().strip("`").removeprefix("json").strip())
+        return {k: v for k, v in parsed.items() if isinstance(v, str) and k in ("workload", "namespace", "metric")}
+    except Exception:
+        return {}

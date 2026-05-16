@@ -1,7 +1,8 @@
-"""LangGraph-based agent orchestration with conditional edges.
+"""LangGraph-based agent orchestration with ReAct executor.
 
-Replaces the sequential run_ops_graph_with_db with a proper StateGraph
-that supports conditional routing based on intent.
+The graph routes: planner → [general_chat → diagnosis] OR [react_executor → diagnosis]
+The ReAct executor autonomously decides which tools to call and when to stop.
+When db is None, falls back to the legacy sequential nodes.
 """
 
 from __future__ import annotations
@@ -18,7 +19,9 @@ from app.agents.nodes import (
     planner_agent,
     retriever_agent,
 )
+from app.agents.react import ReactExecutor
 from app.agents.state import OpsGraphState
+from app.services.mcp import MCPService
 
 
 def _wrap_planner(db=None):
@@ -27,80 +30,71 @@ def _wrap_planner(db=None):
     return node
 
 
-def _wrap_retriever(state: OpsGraphState) -> OpsGraphState:
-    return retriever_agent(state)
-
-
-def _wrap_milvus(db=None):
+def _wrap_react_executor(db=None):
     def node(state: OpsGraphState) -> OpsGraphState:
-        return milvus_agent(state, db=db)
+        if db is None:
+            return state
+        executor = ReactExecutor(db=db, state=state)
+        return executor.run()
     return node
 
 
-def _wrap_observability(state: OpsGraphState) -> OpsGraphState:
-    return observability_agent(state)
-
-
-def _wrap_mcp_ops(db=None):
+def _wrap_legacy_sequential(db=None):
+    """Legacy sequential pipeline for when db is None or ReAct is unavailable."""
     def node(state: OpsGraphState) -> OpsGraphState:
-        return mcp_ops_agent(state, db=db)
+        state = retriever_agent(state)
+        state = milvus_agent(state, db=db)
+        state = observability_agent(state)
+        if db is not None:
+            state = mcp_ops_agent(state, db=db)
+        return state
     return node
 
 
 def _wrap_diagnosis(db=None):
     def node(state: OpsGraphState) -> OpsGraphState:
+        if state.get("llm_reply"):
+            state["root_causes"].append({
+                "title": "ReAct 分析完成",
+                "confidence": 0.8,
+                "evidence_count": len(state["evidence"]),
+            })
+            state["trace"].append({"agent": "DiagnosisAgent", "message": "using ReAct reply"})
+            return state
         return diagnosis_agent(state, db=db)
     return node
 
 
 def _route_after_planner(state: OpsGraphState) -> str:
-    """Conditional edge: skip heavy agents for general chat."""
     if state["intent"] == "general_chat":
         return "diagnosis"
-    return "retriever"
-
-
-def _route_after_observability(state: OpsGraphState) -> str:
-    """Conditional edge: only run MCP tools for actionable intents."""
-    if state["intent"] in {"diagnose_issue", "query_metric", "query_logs", "query_cluster"}:
-        return "mcp_ops"
-    return "diagnosis"
+    return "executor"
 
 
 def build_ops_graph(db=None) -> Any:
-    """Build and compile the LangGraph StateGraph for the ops pipeline."""
     graph = StateGraph(OpsGraphState)
 
     graph.add_node("planner", _wrap_planner(db))
-    graph.add_node("retriever", _wrap_retriever)
-    graph.add_node("milvus", _wrap_milvus(db))
-    graph.add_node("observability", _wrap_observability)
-    graph.add_node("mcp_ops", _wrap_mcp_ops(db))
+    if db is not None:
+        graph.add_node("executor", _wrap_react_executor(db))
+    else:
+        graph.add_node("executor", _wrap_legacy_sequential(db))
     graph.add_node("diagnosis", _wrap_diagnosis(db))
 
     graph.set_entry_point("planner")
 
     graph.add_conditional_edges("planner", _route_after_planner, {
-        "retriever": "retriever",
+        "executor": "executor",
         "diagnosis": "diagnosis",
     })
 
-    graph.add_edge("retriever", "milvus")
-    graph.add_edge("milvus", "observability")
-
-    graph.add_conditional_edges("observability", _route_after_observability, {
-        "mcp_ops": "mcp_ops",
-        "diagnosis": "diagnosis",
-    })
-
-    graph.add_edge("mcp_ops", "diagnosis")
+    graph.add_edge("executor", "diagnosis")
     graph.add_edge("diagnosis", END)
 
     return graph.compile()
 
 
 def run_ops_graph_langgraph(state: OpsGraphState, db=None) -> OpsGraphState:
-    """Execute the full ops pipeline via LangGraph."""
     compiled = build_ops_graph(db=db)
     result = compiled.invoke(state)
     return result

@@ -4,15 +4,17 @@ from collections.abc import Generator
 from sqlalchemy.orm import Session
 
 from app.agents.graph import run_ops_graph_with_db
+from app.agents.memory import conversation_memory
 from app.agents.state import create_initial_state
 from app.runtime import SessionRuntime
 from app.schemas.chatops import ChatOpsMessageRequest, ChatOpsMessageResponse
 
 
 def handle_chatops_message(payload: ChatOpsMessageRequest, db: Session | None = None) -> ChatOpsMessageResponse:
-    state = create_initial_state(session_id=payload.session_id, user_query=payload.message)
+    history = conversation_memory.get_history(payload.session_id or "")
+    state = create_initial_state(session_id=payload.session_id, user_query=payload.message, history=history)
     result = run_ops_graph_with_db(state, db=db)
-    return ChatOpsMessageResponse(
+    response = ChatOpsMessageResponse(
         session_id=result["session_id"],
         intent=result["intent"],
         entities=result["entities"],
@@ -32,23 +34,25 @@ def handle_chatops_message(payload: ChatOpsMessageRequest, db: Session | None = 
         requires_human_approval=result["requires_human_approval"],
         llm_reply=result.get("llm_reply", ""),
     )
+    sid = result["session_id"]
+    conversation_memory.add_message(sid, "user", payload.message)
+    conversation_memory.add_message(sid, "assistant", response.reply or response.llm_reply)
+    return response
 
 
 def handle_chatops_message_stream(
     payload: ChatOpsMessageRequest, db: Session | None = None
 ) -> Generator[str, None, None]:
     """Run the agent graph and yield structured SSE events via Runtime Layer."""
-    from app.agents.nodes import (
-        diagnosis_agent,
-        mcp_ops_agent,
-        milvus_agent,
-        observability_agent,
-        planner_agent,
-        retriever_agent,
-    )
+    from app.agents.nodes import diagnosis_agent, planner_agent
+    from app.agents.react import ReactExecutor
     from app.services.llm import chat_completion_stream
 
-    state = create_initial_state(session_id=payload.session_id, user_query=payload.message)
+    state = create_initial_state(
+        session_id=payload.session_id,
+        user_query=payload.message,
+        history=conversation_memory.get_history(payload.session_id or ""),
+    )
     runtime = SessionRuntime(state["session_id"])
 
     # --- Planner ---
@@ -61,104 +65,58 @@ def handle_chatops_message_stream(
         runtime.agent_runtime.fail_agent(exec_planner, str(e))
     yield _sse_event(runtime, "agent.completed")
 
-    # --- Retriever ---
-    exec_retriever = runtime.agent_runtime.start_agent("RetrieverAgent")
-    yield _sse_event(runtime, "agent.started")
-    try:
-        state = retriever_agent(state)
-        runtime.agent_runtime.complete_agent(exec_retriever)
-    except Exception as e:
-        runtime.agent_runtime.fail_agent(exec_retriever, str(e))
-    yield _sse_event(runtime, "agent.completed")
-
-    # --- Milvus ---
-    exec_milvus = runtime.agent_runtime.start_agent("MilvusAgent")
-    yield _sse_event(runtime, "agent.started")
-    try:
-        state = milvus_agent(state, db=db)
-        runtime.agent_runtime.complete_agent(exec_milvus, {"evidence_count": len(state["evidence"])})
-    except Exception as e:
-        runtime.agent_runtime.fail_agent(exec_milvus, str(e))
-    yield _sse_event(runtime, "agent.completed")
-
-    # --- Observability ---
-    exec_obs = runtime.agent_runtime.start_agent("ObservabilityAgent")
-    yield _sse_event(runtime, "agent.started")
-    try:
-        state = observability_agent(state)
-        runtime.agent_runtime.complete_agent(exec_obs)
-    except Exception as e:
-        runtime.agent_runtime.fail_agent(exec_obs, str(e))
-    yield _sse_event(runtime, "agent.completed")
-
-    # --- MCP Ops Tools ---
-    exec_mcp = runtime.agent_runtime.start_agent("McpOpsAgent")
-    yield _sse_event(runtime, "agent.started")
-    try:
-        state = mcp_ops_agent(state, db=db)
-        runtime.agent_runtime.complete_agent(exec_mcp, {"tool_call_count": len(state["tool_calls"])})
-        for tc in state["tool_calls"]:
-            tool_exec = runtime.tool_runtime.start_tool(
-                tc.get("tool", "unknown"), exec_mcp.id, tc,
-            )
-            if tc.get("status") == "executed":
-                runtime.tool_runtime.complete_tool(tool_exec, tc.get("result", ""))
-            elif tc.get("status") == "error":
-                runtime.tool_runtime.fail_tool(tool_exec, tc.get("error", ""))
-            else:
-                runtime.tool_runtime.complete_tool(tool_exec)
-    except Exception as e:
-        runtime.agent_runtime.fail_agent(exec_mcp, str(e))
-    yield _sse_event(runtime, "agent.completed")
-
-    # Emit evidence summary
-    if state["evidence"]:
-        for ev in state["evidence"][-5:]:
-            runtime.emit("evidence.added", {
-                "source": ev.get("source", ""),
-                "title": ev.get("title", ""),
-                "summary": ev.get("summary", ""),
-            })
-        yield _sse_event(runtime, "evidence.added")
-
-    # --- Diagnosis with streaming LLM ---
-    exec_diag = runtime.agent_runtime.start_agent("DiagnosisAgent")
-    yield _sse_event(runtime, "agent.started")
-
-    if db and state["intent"] in {"diagnose_issue", "search_runbook", "query_metric", "query_logs"}:
-        evidence_text = "\n".join(
-            f"[{e.get('source', '')}] {e.get('title', '')}: {e.get('summary', '')}"
-            for e in state["evidence"][-10:]
-        ) or "暂无证据"
-
-        prompt = f"""你是一位云原生运维专家。根据以下信息为用户提供诊断建议。
-
-用户问题：{state["user_query"]}
-意图：{state["intent"]}
-实体：{state["entities"]}
-证据：
-{evidence_text}
-
-请用中文简要分析（200字以内），包含：可能原因、建议排查方向。"""
+    # --- ReAct or General Chat ---
+    if db and state["intent"] != "general_chat":
+        exec_react = runtime.agent_runtime.start_agent("ReactExecutor")
+        yield _sse_event(runtime, "agent.started")
         try:
-            for token in chat_completion_stream(
-                db,
-                messages=[
-                    {"role": "system", "content": "你是云原生运维专家，回答简洁专业。"},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.3,
-                max_tokens=512,
-            ):
-                yield _sse("token", {"content": token})
-        except Exception:
-            yield _sse("token", {"content": "[LLM 服务暂不可用]"})
-    else:
-        yield _sse("token", {"content": ""})
+            executor = ReactExecutor(db=db, state=state)
+            for sse_event in executor.run_stream():
+                yield sse_event
+            state = executor.state
+            runtime.agent_runtime.complete_agent(exec_react, {
+                "tool_call_count": len(state["tool_calls"]),
+                "evidence_count": len(state["evidence"]),
+            })
+        except Exception as e:
+            runtime.agent_runtime.fail_agent(exec_react, str(e))
+        yield _sse_event(runtime, "agent.completed")
 
-    state = diagnosis_agent(state, db=None)
-    state["llm_reply"] = ""
-    runtime.agent_runtime.complete_agent(exec_diag, {"root_causes": state["root_causes"]})
+        # Emit evidence summary
+        if state["evidence"]:
+            for ev in state["evidence"][-5:]:
+                runtime.emit("evidence.added", {
+                    "source": ev.get("source", ""),
+                    "title": ev.get("title", ""),
+                    "summary": ev.get("summary", "")[:200],
+                })
+            yield _sse_event(runtime, "evidence.added")
+
+        # Stream the final answer if ReAct produced one
+        if state.get("llm_reply"):
+            for chunk in state["llm_reply"]:
+                yield _sse("token", {"content": chunk})
+    else:
+        # General chat: stream LLM reply directly
+        exec_diag = runtime.agent_runtime.start_agent("DiagnosisAgent")
+        yield _sse_event(runtime, "agent.started")
+        if db:
+            try:
+                for token in chat_completion_stream(
+                    db,
+                    messages=[
+                        {"role": "system", "content": "你是 KubeMind 智能运维助手，回答简洁友好。"},
+                        {"role": "user", "content": state["user_query"]},
+                    ],
+                    temperature=0.7,
+                    max_tokens=256,
+                ):
+                    yield _sse("token", {"content": token})
+                    state["llm_reply"] = state.get("llm_reply", "") + token
+            except Exception:
+                yield _sse("token", {"content": "[LLM 服务暂不可用]"})
+        state = diagnosis_agent(state, db=None)
+        runtime.agent_runtime.complete_agent(exec_diag, {"root_causes": state["root_causes"]})
 
     if state["root_causes"]:
         runtime.emit("diagnosis.updated", {
@@ -167,6 +125,8 @@ def handle_chatops_message_stream(
         })
 
     # --- Final done event with runtime trace ---
+    conversation_memory.add_message(state["session_id"], "user", payload.message)
+    conversation_memory.add_message(state["session_id"], "assistant", state.get("llm_reply", ""))
     final = ChatOpsMessageResponse(
         session_id=state["session_id"],
         intent=state["intent"],
