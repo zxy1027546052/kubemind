@@ -1085,6 +1085,16 @@ button.small {
   background: rgba(255, 51, 102, 0.04);
 }
 
+.chatops-success {
+  margin: 14px 22px 0;
+  padding: 9px 12px;
+  border-left: 3px solid var(--accent-green);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--accent-green);
+  background: rgba(57, 255, 20, 0.04);
+}
+
 .chatops-examples {
   display: flex;
   flex-wrap: wrap;

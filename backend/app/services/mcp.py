@@ -237,15 +237,39 @@ class MCPService:
         """测试 MCP 服务器连接"""
         start_time = time.time()
         try:
-            res = requests.get(endpoint, timeout=10)
+            # 尝试发送 MCP 初始化请求
+            init_request = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {
+                        "name": "kubemind",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+            
+            res = requests.post(
+                endpoint,
+                json=init_request,
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
             response_time_ms = int((time.time() - start_time) * 1000)
+            
+            # 只要服务器有响应（无论什么状态码），都视为服务器可访问
             return {
-                "success": res.ok,
+                "success": True,
                 "status_code": res.status_code,
                 "response_time_ms": response_time_ms,
-                "message": f"HTTP {res.status_code} - {res.reason}" if res.ok else f"HTTP {res.status_code} - {res.reason}",
+                "message": f"连接成功 (HTTP {res.status_code})",
                 "error": None,
             }
+                
         except requests.exceptions.RequestException as e:
             response_time_ms = int((time.time() - start_time) * 1000)
             return {

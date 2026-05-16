@@ -39,7 +39,7 @@ function MCPInner() {
   const [selectedServer, setSelectedServer] = useState<MCPServer | null>(null);
   const [toolParams, setToolParams] = useState('{}');
   const [executeResult, setExecuteResult] = useState<ToolExecuteResponse | null>(null);
-  const [notice, setNotice] = useState<string>('');
+  const [notice, setNotice] = useState<{ message: string; isSuccess: boolean } | null>(null);
   const [serverForm, setServerForm] = useState<MCPServerCreate & { id?: number }>({
     id: undefined,
     name: '',
@@ -54,14 +54,14 @@ function MCPInner() {
 
   async function loadData() {
     setLoading(true);
-    setNotice('');
+    setNotice(null);
     try {
       if (activeTab === 'servers') setServers((await api.listMCPServers()).items);
       if (activeTab === 'tools') setTools((await api.listTools()).items);
       if (activeTab === 'audit') setAuditRecords((await api.listAuditRecords()).items);
       if (activeTab === 'policies') setPolicies((await api.listPolicies()).items);
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : 'Load failed');
+      setNotice({ message: err instanceof Error ? err.message : 'Load failed', isSuccess: false });
     } finally {
       setLoading(false);
     }
@@ -100,8 +100,9 @@ function MCPInner() {
       setShowModal(null);
       resetServerForm();
       await loadData();
+      setNotice({ message: selectedServer ? 'Server updated' : 'Server created', isSuccess: true });
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : 'Save failed');
+      setNotice({ message: err instanceof Error ? err.message : 'Save failed', isSuccess: false });
     }
   }
 
@@ -115,9 +116,9 @@ function MCPInner() {
     try {
       const result = await api.testMCPServer(server.endpoint);
       const timeInfo = result.response_time_ms ? ` (${result.response_time_ms}ms)` : '';
-      setNotice(`${server.name}: ${result.message}${timeInfo}`);
+      setNotice({ message: `${server.name}: ${result.message}${timeInfo}`, isSuccess: result.success });
     } catch (err) {
-      setNotice(`${server.name}: ${err instanceof Error ? err.message : 'connection failed'}`);
+      setNotice({ message: `${server.name}: ${err instanceof Error ? err.message : 'connection failed'}`, isSuccess: false });
     }
   }
 
@@ -182,7 +183,13 @@ function MCPInner() {
                   <td>{server.id}</td>
                   <td>{server.name}</td>
                   <td>{server.type}</td>
-                  <td>{server.status}</td>
+                  <td>
+                    <span className={`status-dot ${server.status === 'ACTIVE' ? '' : 'INACTIVE'}`}
+                      style={{ display: 'inline-block', marginRight: '6px' }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6875rem', color: server.status === 'ACTIVE' ? 'var(--accent-green)' : 'var(--text-muted)' }}>
+                      {server.status.toUpperCase()}
+                    </span>
+                  </td>
                   <td className="col-mono">{server.endpoint}</td>
                   <td>{server.tools_count}</td>
                   <td className="table-actions">
@@ -286,7 +293,11 @@ function MCPInner() {
         <h1>MCP Ops Tools</h1>
         <p className="subtitle">FastMCP microservice · tool registry · policy checks · audit trail</p>
       </header>
-      {notice && <div className="chatops-error">{notice}</div>}
+      {notice && (
+        <div className={notice.isSuccess ? 'chatops-success' : 'chatops-error'}>
+          {notice.message}
+        </div>
+      )}
       <div className="card stagger-2">
         <div className="tabs">
           {TABS.map((tab) => (
