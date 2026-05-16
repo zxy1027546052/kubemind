@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, type ModelConfigResponse, type ModelConfigCreate } from '../services/api';
+import PageErrorBoundary from '../components/PageErrorBoundary';
 
 function formatDate(iso: string): string {
   try {
@@ -10,6 +11,14 @@ function formatDate(iso: string): string {
 }
 
 export default function Models() {
+  return (
+    <PageErrorBoundary title="模型配置加载失败">
+      <ModelsInner />
+    </PageErrorBoundary>
+  );
+}
+
+function ModelsInner() {
   const [models, setModels] = useState<ModelConfigResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);

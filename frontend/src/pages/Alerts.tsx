@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, type AlertResponse } from '../services/api';
+import PageErrorBoundary from '../components/PageErrorBoundary';
 
 const SEVERITY_OPTIONS = [
   { value: '', label: '所有等级' },
@@ -41,6 +42,14 @@ function formatDate(iso: string): string {
 }
 
 export default function Alerts() {
+  return (
+    <PageErrorBoundary title="告警管理加载失败">
+      <AlertsInner />
+    </PageErrorBoundary>
+  );
+}
+
+function AlertsInner() {
   const [alerts, setAlerts] = useState<AlertResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

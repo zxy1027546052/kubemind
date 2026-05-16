@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, type WorkflowResponse, type WorkflowStep } from '../services/api';
+import PageErrorBoundary from '../components/PageErrorBoundary';
 
 const STATUS_OPTIONS = [
   { value: '', label: '所有状态' },
@@ -34,6 +35,14 @@ function parseSteps(stepsJson: string): WorkflowStep[] {
 }
 
 export default function Workflows() {
+  return (
+    <PageErrorBoundary title="工作流加载失败">
+      <WorkflowsInner />
+    </PageErrorBoundary>
+  );
+}
+
+function WorkflowsInner() {
   const [workflows, setWorkflows] = useState<WorkflowResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

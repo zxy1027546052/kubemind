@@ -1,5 +1,12 @@
 /* KubeMind API Client — NOC Terminal Edition */
 
+import { z } from 'zod';
+import {
+  ChatOpsMessageResponseSchema,
+  ToolExecuteResponseSchema,
+  parseSchema,
+} from '../schemas';
+
 const API_BASE = '/api';
 
 export interface Document {
@@ -31,7 +38,7 @@ export interface HealthResponse {
   service: string;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestInit, schema?: z.ZodType<unknown>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
@@ -43,7 +50,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (res.status === 204) return undefined as T;
-  return res.json();
+  const data = await res.json();
+  if (schema) return schema.parse(data) as T;
+  return data as T;
 }
 
 export const api = {
@@ -182,7 +191,7 @@ export const api = {
     request<ChatOpsMessageResponse>('/chatops/messages', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    }, ChatOpsMessageResponseSchema),
 
   // MCP / Tools
   listMCPServers: () => request<MCPServerListResponse>('/mcp/servers'),
@@ -217,7 +226,7 @@ export const api = {
     request<ToolExecuteResponse>('/mcp/tools/execute', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    }, ToolExecuteResponseSchema),
 
   listAuditRecords: (params?: { tool_name?: string; session_id?: string; offset?: number; limit?: number }) => {
     const sp = new URLSearchParams();

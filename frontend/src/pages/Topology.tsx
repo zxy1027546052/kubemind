@@ -1,4 +1,6 @@
-export default function Topology() {
+import PageErrorBoundary from '../components/PageErrorBoundary';
+
+function TopologyInner() {
   return (
     <div>
       <header className="page-header stagger-1">
@@ -16,5 +18,13 @@ export default function Topology() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Topology() {
+  return (
+    <PageErrorBoundary title="业务拓扑加载失败">
+      <TopologyInner />
+    </PageErrorBoundary>
   );
 }

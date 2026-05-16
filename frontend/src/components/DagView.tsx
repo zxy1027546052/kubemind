@@ -1,4 +1,4 @@
-import { type AgentEvent, type RuntimeEvent } from '../hooks/useChatOpsStream';
+import { type AgentEvent, type RuntimeEvent } from '../schemas/chatops';
 
 interface DagNode {
   name: string;

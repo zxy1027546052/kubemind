@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, type Document, type DocumentCreate, type SearchResult } from '../services/api';
+import PageErrorBoundary from '../components/PageErrorBoundary';
 
 const TABS = [
   { key: 'case', label: '案例库' },
@@ -31,6 +32,14 @@ function getTagClass(type: string): string {
 }
 
 export default function KnowledgeCenter() {
+  return (
+    <PageErrorBoundary title="知识中心加载失败">
+      <KnowledgeCenterInner />
+    </PageErrorBoundary>
+  );
+}
+
+function KnowledgeCenterInner() {
   const [activeTab, setActiveTab] = useState('doc');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [total, setTotal] = useState(0);

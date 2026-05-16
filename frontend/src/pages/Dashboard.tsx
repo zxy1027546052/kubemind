@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api, type ClusterOverview } from '../services/api';
+import PageErrorBoundary from '../components/PageErrorBoundary';
 
-export default function Dashboard() {
+function DashboardInner() {
   const [data, setData] = useState<ClusterOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -133,5 +134,13 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <PageErrorBoundary title="运维总览加载失败">
+      <DashboardInner />
+    </PageErrorBoundary>
   );
 }

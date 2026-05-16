@@ -1,4 +1,6 @@
-export default function Settings() {
+import PageErrorBoundary from '../components/PageErrorBoundary';
+
+function SettingsInner() {
   return (
     <div>
       <header className="page-header stagger-1">
@@ -16,5 +18,13 @@ export default function Settings() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Settings() {
+  return (
+    <PageErrorBoundary title="系统配置加载失败">
+      <SettingsInner />
+    </PageErrorBoundary>
   );
 }

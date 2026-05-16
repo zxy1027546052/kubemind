@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react';
 import { api, type ClusterOverview, type NodeInfo, type PodInfo } from '../services/api';
+import PageErrorBoundary from '../components/PageErrorBoundary';
 
 export default function Clusters() {
+  return (
+    <PageErrorBoundary title="集群管理加载失败">
+      <ClustersInner />
+    </PageErrorBoundary>
+  );
+}
+
+function ClustersInner() {
   const [overview, setOverview] = useState<ClusterOverview | null>(null);
   const [nodes, setNodes] = useState<NodeInfo[]>([]);
   const [pods, setPods] = useState<PodInfo[]>([]);

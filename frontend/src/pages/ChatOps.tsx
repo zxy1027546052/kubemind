@@ -1,15 +1,11 @@
-import { useState } from 'react';
-import { api, type ChatOpsMessageResponse } from '../services/api';
-import { useChatOpsStream, type TimelineEntry } from '../hooks/useChatOpsStream';
+import { useCallback, useRef } from 'react';
+import { api } from '../services/api';
+import { useChatOpsStore } from '../stores/chatOpsStore';
+import { useRuntimeStore } from '../stores/runtimeStore';
+import type { ChatOpsMessageResponse } from '../schemas/chatops';
+import PageErrorBoundary from '../components/PageErrorBoundary';
 import DagView from '../components/DagView';
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  result?: ChatOpsMessageResponse;
-}
-
-// 简单的 Markdown 渲染组件
 function MarkdownText({ text }: { text: string }) {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
@@ -84,7 +80,7 @@ function sourceLabel(source: string): string {
   return source.toUpperCase();
 }
 
-function TimelinePanel({ entries, status }: { entries: TimelineEntry[]; status: string }) {
+function TimelinePanel({ entries, status }: { entries: { time: string; type: string; label: string; detail?: string; status?: 'running' | 'success' | 'failed'; duration_ms?: number }[]; status: string }) {
   if (entries.length === 0 && status === 'idle') return null;
 
   return (
@@ -110,53 +106,91 @@ function TimelinePanel({ entries, status }: { entries: TimelineEntry[]; status: 
   );
 }
 
-export default function ChatOps() {
-  const [sessionId] = useState(() => `chat-${Date.now().toString(36)}`);
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const [useStream, setUseStream] = useState(true);
-  const { runtime, sendMessage, reset } = useChatOpsStream();
+function ChatOpsInner() {
+  const {
+    sessionId, messages, input, loading, error, expanded, useStream,
+    setInput, addMessage, setLoading, setError, toggleExpand, setUseStream, reset: resetChat,
+  } = useChatOpsStore();
 
-  function toggleExpand(index: number) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  }
+  const { status, timeline, streamedTokens, reset: resetRuntime, processServerEvent, setStatus } = useRuntimeStore();
 
-  async function handleSend() {
-    const message = input.trim();
-    if (!message || loading) return;
+  const abortRef = useRef<AbortController | null>(null);
+
+  const handleSend = useCallback(async () => {
+    const text = input.trim();
+    if (!text || loading) return;
 
     setLoading(true);
     setError('');
-    setMessages((prev) => [...prev, { role: 'user', content: message }]);
+    addMessage({ role: 'user', content: text });
     setInput('');
-    reset();
+    resetRuntime();
+    resetChat();
 
     try {
       if (useStream) {
-        const result = await sendMessage(sessionId, message);
-        const typed = result as ChatOpsMessageResponse | null;
-        const reply = runtime.streamedTokens || typed?.reply || '';
-        setMessages((prev) => [...prev, { role: 'assistant', content: reply, result: typed || undefined }]);
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        setStatus('running');
+
+        const res = await fetch('/api/chatops/messages/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, message: text }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) throw new Error(`Stream failed: ${res.status}`);
+        if (!res.body) throw new Error('No response body');
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalResult: ChatOpsMessageResponse | null = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          let eventType = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith('data: ') && eventType) {
+              const data = JSON.parse(line.slice(6));
+              processServerEvent(eventType, data);
+              if (eventType === 'done') {
+                finalResult = data as ChatOpsMessageResponse;
+              }
+              eventType = '';
+            }
+          }
+        }
+
+        setStatus('completed');
+        const reply = streamedTokens || finalResult?.reply || '';
+        addMessage({ role: 'assistant', content: reply, result: finalResult || undefined });
       } else {
-        const result = await api.sendChatOpsMessage({ session_id: sessionId, message });
-        setMessages((prev) => [...prev, { role: 'assistant', content: result.reply, result }]);
+        const result = await api.sendChatOpsMessage({ session_id: sessionId, message: text });
+        addMessage({ role: 'assistant', content: result.reply, result });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '对话请求失败';
-      setError(msg);
-      setMessages((prev) => [...prev, { role: 'assistant', content: `ERR: ${msg}` }]);
+      if ((err as Error).name !== 'AbortError') {
+        const msg = err instanceof Error ? err.message : '对话请求失败';
+        setError(msg);
+        addMessage({ role: 'assistant', content: `ERR: ${msg}` });
+        setStatus('failed');
+      }
     } finally {
       setLoading(false);
     }
-  }
+  }, [input, loading, useStream, sessionId, streamedTokens, setInput, addMessage, setLoading, setError, resetRuntime, resetChat, processServerEvent, setStatus]);
 
   function renderDetail(result: ChatOpsMessageResponse, index: number) {
     const isExpanded = expanded.has(index);
@@ -328,22 +362,22 @@ export default function ChatOps() {
                       </div>
                     )}
                     <div className="chat-text">
-  {message.role === 'assistant' ? (
-    <MarkdownText text={message.content} />
-  ) : (
-    <span>{message.content}</span>
-  )}
-</div>
+                      {message.role === 'assistant' ? (
+                        <MarkdownText text={message.content} />
+                      ) : (
+                        <span>{message.content}</span>
+                      )}
+                    </div>
                     {message.result && renderDetail(message.result, index)}
                   </div>
                 </div>
               ))
             )}
-            {loading && runtime.streamedTokens && (
+            {loading && streamedTokens && (
               <div className="chat-message assistant">
                 <div className="chat-role">kubemind</div>
                 <div className="chat-bubble">
-                  <div className="chat-text streaming">{runtime.streamedTokens}<span className="cursor" /></div>
+                  <div className="chat-text streaming">{streamedTokens}<span className="cursor" /></div>
                 </div>
               </div>
             )}
@@ -377,9 +411,17 @@ export default function ChatOps() {
       </div>
 
       <aside className="chatops-sidebar">
-        <DagView events={runtime.events} />
-        <TimelinePanel entries={runtime.timeline} status={runtime.status} />
+        <DagView events={[]} />
+        <TimelinePanel entries={timeline} status={status} />
       </aside>
     </div>
+  );
+}
+
+export default function ChatOps() {
+  return (
+    <PageErrorBoundary title="对话式运维加载失败">
+      <ChatOpsInner />
+    </PageErrorBoundary>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import PageErrorBoundary from '../components/PageErrorBoundary';
 import {
   api,
   type AuditRecordResponse,
@@ -19,6 +20,14 @@ const TABS = [
 ];
 
 export default function MCP() {
+  return (
+    <PageErrorBoundary title="MCP 加载失败">
+      <MCPInner />
+    </PageErrorBoundary>
+  );
+}
+
+function MCPInner() {
   const [activeTab, setActiveTab] = useState('servers');
   const [servers, setServers] = useState<MCPServer[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
@@ -86,8 +95,8 @@ export default function MCP() {
         endpoint: serverForm.endpoint,
         metadata_json: serverForm.metadata_json,
       };
-      if (selectedServer) await api.updateMCPServer(selectedServer.id, data);
-      else await api.createMCPServer(data);
+      if (selectedServer) await api.updateMCPServer(selectedServer.id, data as Partial<MCPServer>);
+      else await api.createMCPServer(data as Partial<MCPServer>);
       setShowModal(null);
       resetServerForm();
       await loadData();
