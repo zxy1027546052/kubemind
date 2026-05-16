@@ -109,10 +109,15 @@ function TimelinePanel({ entries, status }: { entries: { time: string; type: str
 function ChatOpsInner() {
   const {
     sessionId, messages, input, loading, error, expanded, useStream,
-    setInput, addMessage, setLoading, setError, toggleExpand, setUseStream,
+    setInput, addMessage, setLoading, setError, toggleExpand, setUseStream, reset: resetChat,
   } = useChatOpsStore();
 
   const { status, timeline, reset: resetRuntime, processServerEvent, setStatus, getCurrentTokens } = useRuntimeStore();
+
+  const handleClearHistory = useCallback(() => {
+    resetChat();
+    resetRuntime();
+  }, [resetChat, resetRuntime]);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -331,6 +336,9 @@ function ChatOpsInner() {
           <div className="card-header">
             <h3>会话终端</h3>
             <div className="card-header-actions">
+              <button type="button" className="ghost" onClick={handleClearHistory}>
+                清理历史
+              </button>
               <label className="stream-toggle">
                 <input type="checkbox" checked={useStream} onChange={(e) => setUseStream(e.target.checked)} />
                 <span>Stream</span>
