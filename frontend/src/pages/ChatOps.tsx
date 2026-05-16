@@ -9,6 +9,49 @@ interface ChatMessage {
   result?: ChatOpsMessageResponse;
 }
 
+// 简单的 Markdown 渲染组件
+function MarkdownText({ text }: { text: string }) {
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+
+  for (const line of lines) {
+    const key = `md-${elements.length}`;
+    if (line.startsWith('## ')) {
+      elements.push(<h3 key={key} className="markdown-h2">{line.slice(3)}</h3>);
+    } else if (line.startsWith('### ')) {
+      elements.push(<h4 key={key} className="markdown-h3">{line.slice(4)}</h4>);
+    } else if (line.startsWith('- ')) {
+      elements.push(<div key={key} className="markdown-list-item">{line}</div>);
+    } else if (line.match(/^\d+\. /)) {
+      elements.push(<div key={key} className="markdown-ordered-item">{line}</div>);
+    } else if (line.includes('**')) {
+      const parts = line.split(/(\*\*.*?\*\*)/g);
+      const richParts = parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={`${key}-b-${i}`} className="markdown-bold">{part.slice(2, -2)}</strong>;
+        }
+        return <span key={`${key}-s-${i}`}>{part}</span>;
+      });
+      elements.push(<p key={key} className="markdown-p">{richParts}</p>);
+    } else if (line.includes('`')) {
+      const parts = line.split(/(`.*?`)/g);
+      const richParts = parts.map((part, i) => {
+        if (part.startsWith('`') && part.endsWith('`')) {
+          return <code key={`${key}-c-${i}`} className="markdown-code">{part.slice(1, -1)}</code>;
+        }
+        return <span key={`${key}-s-${i}`}>{part}</span>;
+      });
+      elements.push(<p key={key} className="markdown-p">{richParts}</p>);
+    } else if (line.trim()) {
+      elements.push(<p key={key} className="markdown-p">{line}</p>);
+    } else {
+      elements.push(<br key={key} />);
+    }
+  }
+
+  return <div className="markdown-content">{elements}</div>;
+}
+
 const EXAMPLES = [
   '帮我分析 prod payment-api 最近错误日志',
   '查一下 prod payment-api 的 CPU 指标',
@@ -284,7 +327,13 @@ export default function ChatOps() {
                         )}
                       </div>
                     )}
-                    <div className="chat-text">{message.content}</div>
+                    <div className="chat-text">
+  {message.role === 'assistant' ? (
+    <MarkdownText text={message.content} />
+  ) : (
+    <span>{message.content}</span>
+  )}
+</div>
                     {message.result && renderDetail(message.result, index)}
                   </div>
                 </div>

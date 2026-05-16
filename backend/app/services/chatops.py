@@ -182,34 +182,167 @@ def _build_reply(
 
     # 尝试从 evidence 中提取已执行的工具结果
     mcp_evidences = [e for e in evidence if e.get("source") == "mcp" and e.get("score", 0) > 0]
-    if mcp_evidences:
-        summaries = [e.get("summary", "") for e in mcp_evidences if e.get("summary")]
-        if summaries:
-            return f"查询 {namespace} 结果:\n" + "\n".join(summaries)
-
+    
     if intent == "query_cluster":
-        return f"已查询 {namespace}，详见工具调用结果。"
+        return _format_cluster_response(namespace, workload, mcp_evidences, tool_calls)
     if intent == "query_metric":
-        return f"已查询 {namespace} 中 {workload} 的指标数据。"
+        return _format_metric_response(namespace, workload, mcp_evidences)
     if intent == "query_logs":
-        return f"已检索 {namespace} 中 {workload} 的日志。"
+        return _format_logs_response(namespace, workload, mcp_evidences)
     if intent == "search_runbook":
-        return "已从知识库召回相关处理手册，详见证据列表。"
+        return _format_runbook_response(evidence)
     if intent == "create_workflow":
         suffix = "该动作需要人工确认。" if requires_human_approval else ""
         return f"已识别为创建排查流程。{suffix}"
+    if intent == "diagnose_issue":
+        return _format_diagnosis_response(namespace, workload, evidence, tool_calls)
     if intent == "general_chat":
         return (
-            "我是 KubeMind 智能运维助手，支持以下能力：\n"
-            "• 指标查询 — 查询 CPU、内存等资源指标\n"
-            "• 日志查询 — 检索服务错误日志\n"
-            "• 故障诊断 — 分析故障现象并生成根因候选\n"
-            "• Runbook 检索 — 从知识库召回相关处理手册\n"
-            "• 集群查询 — 查看集群、节点、Pod 状态\n"
-            "• 流程创建 — 生成标准化排查流程\n\n"
+            "我是 KubeMind 智能运维助手，支持以下能力：\n\n"
+            "📊 **指标查询** — 查询 CPU、内存等资源指标\n"
+            "📝 **日志查询** — 检索服务错误日志\n"
+            "🔍 **故障诊断** — 分析故障现象并生成根因候选\n"
+            "📚 **Runbook 检索** — 从知识库召回相关处理手册\n"
+            "☸️ **集群查询** — 查看集群、节点、Pod 状态\n"
+            "🔄 **流程创建** — 生成标准化排查流程\n\n"
             "请用自然语言描述你的运维需求。"
         )
-    return f"已识别为故障诊断，将围绕 {namespace} 中 {workload} 收集证据并生成根因候选。"
+    return f"已识别为故障诊断，将围绕 `{namespace}` 中 `{workload}` 收集证据并生成根因候选。"
+
+
+def _format_cluster_response(namespace: str, workload: str, evidences: list, tool_calls: list) -> str:
+    """格式化集群查询响应"""
+    result = [f"## 查询结果: `{namespace}` 命名空间"]
+    
+    if evidences:
+        for ev in evidences[:3]:
+            summary = ev.get("summary", "")
+            if summary:
+                try:
+                    data = json.loads(summary)
+                    if isinstance(data, dict) and "items" in data:
+                        items = data["items"]
+                        if isinstance(items, list) and len(items) > 0:
+                            result.append(f"\n### 发现 {len(items)} 个对象")
+                            for item in items[:5]:
+                                name = item.get("name", item.get("metadata", {}).get("name", "Unknown"))
+                                status = item.get("status", item.get("phase", "Unknown"))
+                                result.append(f"- `{name}` | {status}")
+                            if len(items) > 5:
+                                result.append(f"- ... 还有 {len(items) - 5} 个")
+                        else:
+                            result.append(f"\n{summary[:300]}")
+                    else:
+                        result.append(f"\n{summary[:300]}")
+                except:
+                    result.append(f"\n{summary[:300]}")
+    
+    if tool_calls:
+        result.append("\n### 执行的工具")
+        for tc in tool_calls:
+            status = "✅" if tc.get("status") == "executed" else "❌"
+            result.append(f"{status} `{tc.get('tool', '')}`")
+    
+    return "\n".join(result)
+
+
+def _format_metric_response(namespace: str, workload: str, evidences: list) -> str:
+    """格式化指标查询响应"""
+    result = [f"## 指标查询: `{namespace}` / `{workload}`"]
+    
+    if evidences:
+        for ev in evidences[:2]:
+            summary = ev.get("summary", "")
+            if summary:
+                try:
+                    data = json.loads(summary)
+                    if isinstance(data, dict):
+                        result.append("\n### 指标数据")
+                        for key, value in list(data.items())[:6]:
+                            if isinstance(value, dict) and "value" in value:
+                                val = value["value"]
+                                result.append(f"- **{key}**: `{val}`")
+                            elif isinstance(value, (int, float)):
+                                result.append(f"- **{key}**: `{value}`")
+                            else:
+                                result.append(f"- **{key}**: {str(value)[:50]}")
+                    else:
+                        result.append(f"\n{summary[:400]}")
+                except:
+                    result.append(f"\n{summary[:400]}")
+    
+    return "\n".join(result)
+
+
+def _format_logs_response(namespace: str, workload: str, evidences: list) -> str:
+    """格式化日志查询响应"""
+    result = [f"## 日志查询: `{namespace}` / `{workload}`"]
+    
+    if evidences:
+        for ev in evidences[:2]:
+            summary = ev.get("summary", "")
+            if summary:
+                try:
+                    data = json.loads(summary)
+                    if isinstance(data, dict) and "result" in data:
+                        logs = data["result"]
+                        if isinstance(logs, list):
+                            result.append("\n### 日志片段")
+                            for log_entry in logs[:8]:
+                                if isinstance(log_entry, dict):
+                                    ts = log_entry.get("timestamp", log_entry.get("ts", ""))
+                                    msg = log_entry.get("message", log_entry.get("line", ""))
+                                    result.append(f"`{ts}` | {msg[:80]}")
+                                elif isinstance(log_entry, str):
+                                    result.append(log_entry[:100])
+                        else:
+                            result.append(f"\n{summary[:400]}")
+                    else:
+                        result.append(f"\n{summary[:400]}")
+                except:
+                    result.append(f"\n{summary[:400]}")
+    
+    return "\n".join(result)
+
+
+def _format_runbook_response(evidence: list) -> str:
+    """格式化 Runbook 检索响应"""
+    result = ["## 知识库检索结果"]
+    
+    kb_evidence = [e for e in evidence if e.get("source") == "milvus"]
+    if kb_evidence:
+        result.append(f"\n### 找到 {len(kb_evidence)} 个相关文档")
+        for i, ev in enumerate(kb_evidence[:3], 1):
+            title = ev.get("title", "Untitled")
+            score = ev.get("score", 0)
+            summary = ev.get("summary", "")
+            result.append(f"\n{i}. **{title}**")
+            result.append(f"   匹配度: {int(score * 100)}%")
+            result.append(f"   {summary[:150]}...")
+    else:
+        result.append("\n未找到相关文档")
+    
+    return "\n".join(result)
+
+
+def _format_diagnosis_response(namespace: str, workload: str, evidence: list, tool_calls: list) -> str:
+    """格式化诊断响应"""
+    result = [f"## 故障诊断分析"]
+    result.append(f"\n**目标**: `{namespace}` / `{workload}`")
+    
+    # 执行的工具
+    if tool_calls:
+        executed = [tc for tc in tool_calls if tc.get("status") == "executed"]
+        result.append(f"\n**已收集证据**: {len(executed)}/{len(tool_calls)} 工具执行成功")
+    
+    # 证据摘要
+    mcp_evidence = [e for e in evidence if e.get("source") == "mcp"]
+    if mcp_evidence:
+        result.append("\n**证据来源**:")
+        for ev in mcp_evidence[:3]:
+            result.append(f"- `{ev.get('title', '')}`")
+    
+    return "\n".join(result)
 
 
 def _sse(event: str, data: dict | str) -> str:
